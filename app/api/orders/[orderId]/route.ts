@@ -1,8 +1,8 @@
 import { kv } from "@vercel/kv"
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { db } from "../../../../lib/db"
 
-export async function GET(request: Request, { params }: { params: { orderId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: { orderId: string } }) {
   try {
     const { orderId } = params
 
@@ -29,7 +29,7 @@ export async function GET(request: Request, { params }: { params: { orderId: str
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { orderId: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: { orderId: string } }) {
   try {
     const body = (await request.json()) as { status: "PENDING" | "PREPARING" | "COMPLETED" | "CANCELLED" }
     const { status } = body
