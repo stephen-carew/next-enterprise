@@ -3,13 +3,7 @@ import * as RadixDialog from "@radix-ui/react-dialog";
 import { useEffect, useState } from "react";
 import { Button } from "../../../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card";
-
-
-
-
 import { Input } from "../../../components/ui/input";
-
-
 import { Drink, Order } from "../../../lib/types";
 
 
