@@ -2,6 +2,7 @@ import { kv } from "@vercel/kv"
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "../../../../lib/db"
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export async function GET(req: NextRequest, context: { params: { orderId: string } }) {
   try {
     const { orderId } = context.params
@@ -29,6 +30,7 @@ export async function GET(req: NextRequest, context: { params: { orderId: string
   }
 }
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export async function PATCH(req: NextRequest, context: { params: { orderId: string } }) {
   try {
     const body = (await req.json()) as { status: "PENDING" | "PREPARING" | "COMPLETED" | "CANCELLED" }
