@@ -6,9 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui
 import { Input } from "../../../components/ui/input";
 import { Drink, Order } from "../../../lib/types";
 
-
-export default function OrderStatusPage({ params }: { params: { orderId: string } }) {
-    const { orderId } = params;
+export default function OrderStatusPage({ params }: { params: Promise<{ orderId: string }> }) {
+    const [orderId, setOrderId] = useState<string>("");
     const [order, setOrder] = useState<Order | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [editOpen, setEditOpen] = useState(false);
@@ -16,6 +15,15 @@ export default function OrderStatusPage({ params }: { params: { orderId: string 
     const [editOrder, setEditOrder] = useState<{ [drinkId: string]: number }>({});
 
     useEffect(() => {
+        // Get orderId from params
+        params.then(({ orderId }) => {
+            setOrderId(orderId);
+        });
+    }, [params]);
+
+    useEffect(() => {
+        if (!orderId) return;
+
         // Fetch initial order
         fetchOrder();
 
