@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Drink {
+  id          String       @id @default(cuid())
+  name        String
+  description String
+  price       Float
+  category    String
+  imageUrl    String?
+  isAvailable Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  OrderDrink  OrderDrink[]
+}
+
+model Table {
+  id        String   @id @default(cuid())
+  number    Int      @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders    Order[]
+}
+
+model Order {
+  id         String       @id @default(cuid())
+  tableId    String
+  status     OrderStatus  @default(PENDING)
+  total      Float
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  table      Table        @relation(fields: [tableId], references: [id])
+  OrderDrink OrderDrink[]
+}
+
+model OrderDrink {
+  id        String   @id @default(cuid())
+  orderId   String
+  drinkId   String
+  quantity  Int
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Drink     Drink    @relation(fields: [drinkId], references: [id])
+  Order     Order    @relation(fields: [orderId], references: [id])
+
+  @@unique([orderId, drinkId])
+}
+
+enum OrderStatus {
+  PENDING
+  PREPARING
+  COMPLETED
+  CANCELLED
+}
