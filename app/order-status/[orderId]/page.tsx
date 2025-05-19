@@ -1,5 +1,7 @@
 "use client";
+
 import * as RadixDialog from "@radix-ui/react-dialog";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "../../../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card";
@@ -13,6 +15,7 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
     const [editOpen, setEditOpen] = useState(false);
     const [drinks, setDrinks] = useState<Drink[]>([]);
     const [editOrder, setEditOrder] = useState<{ [drinkId: string]: number }>({});
+    const router = useRouter();
 
     useEffect(() => {
         // Get orderId from params
@@ -101,6 +104,10 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
         }
     };
 
+    const handleNewOrder = () => {
+        router.push("/");
+    };
+
     if (isLoading) {
         return (
             <div className="min-h-screen w-full bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -123,6 +130,8 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
             </div>
         );
     }
+
+    const isOrderCompleted = order.status === "COMPLETED" || order.status === "CANCELLED";
 
     return (
         <div className="min-h-screen w-full bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -164,8 +173,27 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
                     </CardContent>
                 </Card>
                 <div className="flex gap-4 justify-end mt-6">
-                    <Button variant="outline" onClick={() => setEditOpen(true)}>Edit</Button>
-                    <Button variant="destructive">Cancel Order</Button>
+                    {isOrderCompleted ? (
+                        <Button onClick={handleNewOrder} className="w-full md:w-auto">
+                            Create New Order
+                        </Button>
+                    ) : (
+                        <>
+                            <Button
+                                variant="outline"
+                                onClick={() => setEditOpen(true)}
+                                disabled={isOrderCompleted}
+                            >
+                                Edit
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                disabled={isOrderCompleted}
+                            >
+                                Cancel Order
+                            </Button>
+                        </>
+                    )}
                 </div>
                 <RadixDialog.Root open={editOpen} onOpenChange={setEditOpen}>
                     <RadixDialog.Portal>
