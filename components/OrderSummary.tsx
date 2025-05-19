@@ -79,20 +79,22 @@ export function OrderSummary() {
     }
 
     return (
-        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 sticky top-4">
+        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 md:sticky md:top-4 fixed bottom-0 left-0 right-0 z-50 md:z-0 md:rounded-lg rounded-t-lg shadow-lg md:shadow-none">
             <CardHeader>
                 <CardTitle className="text-gray-900 dark:text-gray-100">Order Summary</CardTitle>
             </CardHeader>
             <CardContent>
                 <div className="space-y-4">
-                    {items.map((item) => (
-                        <div key={item.drinkId} className="flex justify-between text-gray-700 dark:text-gray-300">
-                            <span>
-                                {item.quantity}x {item.drink.name}
-                            </span>
-                            <span>${(item.price * item.quantity).toFixed(2)}</span>
-                        </div>
-                    ))}
+                    <div className="max-h-[40vh] md:max-h-none overflow-y-auto">
+                        {items.map((item) => (
+                            <div key={item.drinkId} className="flex justify-between text-gray-700 dark:text-gray-300">
+                                <span>
+                                    {item.quantity}x {item.drink.name}
+                                </span>
+                                <span>${(item.price * item.quantity).toFixed(2)}</span>
+                            </div>
+                        ))}
+                    </div>
                     <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                         <div className="flex justify-between font-bold text-gray-900 dark:text-gray-100">
                             <span>Total</span>
