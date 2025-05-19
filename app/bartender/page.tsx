@@ -1,6 +1,6 @@
 "use client"
 import { motion } from "framer-motion";
-import { useEffect, useRef, useState, } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
@@ -38,7 +38,21 @@ export default function BartenderPage() {
                     return;
                 }
 
+                // Handle new order
+                if (data.order && !data.status) {
+                    console.log("New order received:", data.order);
+                    setOrders(prevOrders => {
+                        const orderWithTable: OrderWithTable = {
+                            ...data.order!,
+                            tableNumber: data.order!.table.number
+                        };
+                        return [orderWithTable, ...prevOrders];
+                    });
+                }
+
+                // Handle status updates
                 if (data.orderId && data.status) {
+                    console.log("Status update received:", { orderId: data.orderId, status: data.status });
                     setOrders(prevOrders => {
                         const orderIndex = prevOrders.findIndex(order => order.id === data.orderId);
                         if (orderIndex === -1) return prevOrders;
@@ -56,7 +70,8 @@ export default function BartenderPage() {
                 }
 
                 // Handle full order updates
-                if (data.order && data.order.table) {
+                if (data.order && data.status) {
+                    console.log("Full order update received:", data.order);
                     setOrders(prevOrders => {
                         const orderIndex = prevOrders.findIndex(order => order.id === data.order!.id);
                         const orderWithTable: OrderWithTable = {
@@ -65,10 +80,8 @@ export default function BartenderPage() {
                         };
 
                         if (orderIndex === -1) {
-                            // If it's a new order, add it to the list
-                            return [...prevOrders, orderWithTable];
+                            return [orderWithTable, ...prevOrders];
                         }
-                        // Update existing order
                         const updatedOrders = [...prevOrders];
                         updatedOrders[orderIndex] = orderWithTable;
                         return updatedOrders;
@@ -139,10 +152,6 @@ export default function BartenderPage() {
             }
 
             console.log("Order updated successfully:", data);
-
-            // Note: We don't need to manually update the state here
-            // as the SSE will handle the update automatically
-
             toast.success(`Order marked as ${status.toLowerCase()}`);
         } catch (error) {
             console.error("Error updating order status:", error);

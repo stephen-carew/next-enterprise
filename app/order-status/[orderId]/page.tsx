@@ -2,11 +2,18 @@
 
 import * as RadixDialog from "@radix-ui/react-dialog";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../../../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card";
 import { Input } from "../../../components/ui/input";
 import { Drink, Order } from "../../../lib/types";
+
+interface SSEUpdate {
+    type?: "connected";
+    orderId?: string;
+    status?: Order["status"];
+    order?: Order;
+}
 
 export default function OrderStatusPage({ params }: { params: Promise<{ orderId: string }> }) {
     const [orderId, setOrderId] = useState<string>("");
@@ -16,6 +23,7 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
     const [drinks, setDrinks] = useState<Drink[]>([]);
     const [editOrder, setEditOrder] = useState<{ [drinkId: string]: number }>({});
     const router = useRouter();
+    const eventSourceRef = useRef<EventSource | null>(null);
 
     useEffect(() => {
         // Get orderId from params
@@ -31,26 +39,52 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
         fetchOrder();
 
         // Set up SSE connection
-        const eventSource = new EventSource('/api/orders/events');
+        eventSourceRef.current = new EventSource('/api/orders/events');
 
-        eventSource.onmessage = (event) => {
-            const data = JSON.parse(event.data) as { orderId?: string; status?: Order["status"]; order?: Order };
-            if (data.orderId === orderId) {
-                if (data.order) {
-                    setOrder(data.order);
-                } else if (data.status && order) {
-                    setOrder({ ...order, status: data.status });
+        eventSourceRef.current.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data) as SSEUpdate;
+                console.log("Received SSE update:", data);
+
+                if (data.type === "connected") {
+                    console.log("SSE connected");
+                    return;
                 }
+
+                // Handle status updates for this order
+                if (data.orderId === orderId) {
+                    if (data.order) {
+                        console.log("Full order update received:", data.order);
+                        setOrder(data.order);
+                    } else if (data.status && order) {
+                        console.log("Status update received:", { orderId, status: data.status });
+                        setOrder(prevOrder => {
+                            if (!prevOrder) return null;
+                            return { ...prevOrder, status: data.status! };
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error("Error processing SSE message:", error);
             }
         };
 
-        eventSource.onerror = (error) => {
+        eventSourceRef.current.onerror = (error) => {
             console.error('SSE Error:', error);
-            eventSource.close();
+            if (eventSourceRef.current) {
+                eventSourceRef.current.close();
+                // Attempt to reconnect after a delay
+                setTimeout(() => {
+                    console.log("Attempting to reconnect SSE...");
+                    eventSourceRef.current = new EventSource('/api/orders/events');
+                }, 5000);
+            }
         };
 
         return () => {
-            eventSource.close();
+            if (eventSourceRef.current) {
+                eventSourceRef.current.close();
+            }
         };
     }, [orderId, order]);
 
