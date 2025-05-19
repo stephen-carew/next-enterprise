@@ -2,15 +2,9 @@ import { kv } from "@vercel/kv"
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "../../../../lib/db"
 
-type Props = {
-  params: {
-    orderId: string
-  }
-}
-
-export async function GET(request: NextRequest, props: Props) {
+export async function GET(request: NextRequest, { params }: { params: { orderId: string } }) {
   try {
-    const { orderId } = props.params
+    const { orderId } = params
 
     const order = await db.order.findUnique({
       where: { id: orderId },
@@ -35,11 +29,11 @@ export async function GET(request: NextRequest, props: Props) {
   }
 }
 
-export async function PATCH(request: NextRequest, props: Props) {
+export async function PATCH(request: NextRequest, { params }: { params: { orderId: string } }) {
   try {
     const body = (await request.json()) as { status: "PENDING" | "PREPARING" | "COMPLETED" | "CANCELLED" }
     const { status } = body
-    const { orderId } = props.params
+    const { orderId } = params
 
     // Update order in database
     const updatedOrder = await db.order.update({
