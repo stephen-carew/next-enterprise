@@ -35,6 +35,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { status } = body
     const { orderId } = await params
 
+    // Check if order exists
+    const existingOrder = await db.order.findUnique({
+      where: { id: orderId },
+    })
+
+    if (!existingOrder) {
+      console.error(`Order not found: ${orderId}`)
+      return NextResponse.json({ error: "Order not found" }, { status: 404 })
+    }
+
     // Update order in database
     const updatedOrder = await db.order.update({
       where: { id: orderId },
@@ -49,17 +59,25 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       },
     })
 
-    // Store in KV and publish update
-    await kv.set(`orders:${orderId}`, updatedOrder)
-    await kv.publish("orders:update", {
-      orderId,
-      status,
-      order: updatedOrder,
-    })
+    try {
+      // Store in KV and publish update
+      await kv.set(`orders:${orderId}`, updatedOrder)
+      await kv.publish("orders:update", {
+        orderId,
+        status,
+        order: updatedOrder,
+      })
+    } catch (kvError) {
+      console.error("Error updating KV store:", kvError)
+      // Continue even if KV update fails
+    }
 
     return NextResponse.json(updatedOrder)
   } catch (error) {
     console.error("Error updating order:", error)
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
     return NextResponse.json({ error: "Failed to update order" }, { status: 500 })
   }
 }

@@ -1,6 +1,6 @@
 "use client"
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, } from "react";
 import toast from "react-hot-toast";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
@@ -10,36 +10,91 @@ interface OrderWithTable extends Order {
     tableNumber: number;
 }
 
+interface SSEUpdate {
+    type?: "connected";
+    orderId?: string;
+    status?: Order["status"];
+    order?: Order;
+}
+
 export default function BartenderPage() {
     const [orders, setOrders] = useState<OrderWithTable[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const eventSourceRef = useRef<EventSource | null>(null);
 
     useEffect(() => {
         fetchOrders();
 
         // Set up SSE connection
-        const eventSource = new EventSource('/api/orders/events');
+        eventSourceRef.current = new EventSource('/api/orders/events');
 
-        eventSource.onmessage = (event) => {
-            const data = JSON.parse(event.data) as { orderId?: string; status?: Order["status"] };
-            if (data.orderId && data.status) {
-                setOrders(prevOrders =>
-                    prevOrders.map(order =>
-                        order.id === data.orderId
-                            ? { ...order, status: data.status! }
-                            : order
-                    )
-                );
+        eventSourceRef.current.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data) as SSEUpdate;
+                console.log("Received SSE update:", data);
+
+                if (data.type === "connected") {
+                    console.log("SSE connected");
+                    return;
+                }
+
+                if (data.orderId && data.status) {
+                    setOrders(prevOrders => {
+                        const orderIndex = prevOrders.findIndex(order => order.id === data.orderId);
+                        if (orderIndex === -1) return prevOrders;
+
+                        const updatedOrders = [...prevOrders];
+                        const existingOrder = updatedOrders[orderIndex];
+                        if (!existingOrder) return prevOrders;
+
+                        updatedOrders[orderIndex] = {
+                            ...existingOrder,
+                            status: data.status!
+                        };
+                        return updatedOrders;
+                    });
+                }
+
+                // Handle full order updates
+                if (data.order && data.order.table) {
+                    setOrders(prevOrders => {
+                        const orderIndex = prevOrders.findIndex(order => order.id === data.order!.id);
+                        const orderWithTable: OrderWithTable = {
+                            ...data.order!,
+                            tableNumber: data.order!.table.number
+                        };
+
+                        if (orderIndex === -1) {
+                            // If it's a new order, add it to the list
+                            return [...prevOrders, orderWithTable];
+                        }
+                        // Update existing order
+                        const updatedOrders = [...prevOrders];
+                        updatedOrders[orderIndex] = orderWithTable;
+                        return updatedOrders;
+                    });
+                }
+            } catch (error) {
+                console.error("Error processing SSE message:", error);
             }
         };
 
-        eventSource.onerror = (error) => {
+        eventSourceRef.current.onerror = (error) => {
             console.error('SSE Error:', error);
-            eventSource.close();
+            if (eventSourceRef.current) {
+                eventSourceRef.current.close();
+                // Attempt to reconnect after a delay
+                setTimeout(() => {
+                    console.log("Attempting to reconnect SSE...");
+                    eventSourceRef.current = new EventSource('/api/orders/events');
+                }, 5000);
+            }
         };
 
         return () => {
-            eventSource.close();
+            if (eventSourceRef.current) {
+                eventSourceRef.current.close();
+            }
         };
     }, []);
 
@@ -77,26 +132,21 @@ export default function BartenderPage() {
                 body: JSON.stringify({ status }),
             });
 
+            const data = await response.json() as { error?: string } | Order;
+
             if (!response.ok) {
-                throw new Error("Failed to update order status");
+                throw new Error('error' in data ? data.error : "Failed to update order status");
             }
 
-            const updatedOrder = await response.json();
-            console.log("Order updated successfully:", updatedOrder);
+            console.log("Order updated successfully:", data);
 
-            // Update local state immediately
-            setOrders(prevOrders =>
-                prevOrders.map(order =>
-                    order.id === orderId
-                        ? { ...order, status }
-                        : order
-                )
-            );
+            // Note: We don't need to manually update the state here
+            // as the SSE will handle the update automatically
 
             toast.success(`Order marked as ${status.toLowerCase()}`);
         } catch (error) {
             console.error("Error updating order status:", error);
-            toast.error("Failed to update order status");
+            toast.error(error instanceof Error ? error.message : "Failed to update order status");
         }
     };
 
