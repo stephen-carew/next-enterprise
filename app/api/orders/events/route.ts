@@ -6,17 +6,27 @@ export async function GET() {
   const customReadable = new ReadableStream({
     async start(controller) {
       // Send initial connection message
-      controller.enqueue(encoder.encode("data: connected\n\n"))
+      controller.enqueue(encoder.encode("data: " + JSON.stringify({ type: "connected" }) + "\n\n"))
 
-      // Subscribe to order updates
-      const subscriber = kv.subscribe("orders:*")
-      subscriber.on("message", (message) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(message)}\n\n`))
+      // Subscribe to both specific order updates and general updates
+      const subscribers = [kv.subscribe("orders:update"), kv.subscribe("orders:*")]
+
+      // Handle messages from all subscribers
+      subscribers.forEach((subscriber) => {
+        subscriber.on("message", (message) => {
+          try {
+            // Ensure the message is properly formatted
+            const data = typeof message === "string" ? JSON.parse(message) : message
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
+          } catch (error) {
+            console.error("Error processing SSE message:", error)
+          }
+        })
       })
 
       // Handle client disconnect
       return () => {
-        subscriber.unsubscribe()
+        subscribers.forEach((subscriber) => subscriber.unsubscribe())
       }
     },
   })

@@ -62,10 +62,27 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     try {
       // Store in KV and publish update
       await kv.set(`orders:${orderId}`, updatedOrder)
-      await kv.publish("orders:update", {
+
+      // Publish both specific order update and general update
+      await Promise.all([
+        // Publish specific order update
+        kv.publish(`orders:${orderId}`, {
+          orderId,
+          status,
+          order: updatedOrder,
+        }),
+        // Publish general update for all clients
+        kv.publish("orders:update", {
+          orderId,
+          status,
+          order: updatedOrder,
+        }),
+      ])
+
+      console.log("Published order updates:", {
         orderId,
         status,
-        order: updatedOrder,
+        timestamp: new Date().toISOString(),
       })
     } catch (kvError) {
       console.error("Error updating KV store:", kvError)
