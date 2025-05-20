@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
 import { db } from "@/lib/db"
+import prisma from "@/lib/prisma"
 
 interface OrderItem {
   drinkId: string
@@ -11,7 +13,44 @@ interface CreateOrderRequest {
 }
 
 type RouteContext = {
-  params: Promise<{ tableId: string }>
+  params: Promise<{
+    tableId: string
+  }>
+}
+
+export async function GET(request: NextRequest, context: RouteContext) {
+  try {
+    const session = await getServerSession()
+    if (!session) {
+      return new NextResponse("Unauthorized", { status: 401 })
+    }
+
+    const { tableId } = await context.params
+
+    const orders = await prisma.order.findMany({
+      where: {
+        tableId,
+        status: {
+          not: "COMPLETED",
+        },
+      },
+      include: {
+        OrderDrink: {
+          include: {
+            Drink: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    })
+
+    return NextResponse.json(orders)
+  } catch (error) {
+    console.error("Error fetching table orders:", error)
+    return new NextResponse("Internal Server Error", { status: 500 })
+  }
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {

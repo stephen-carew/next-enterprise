@@ -1,5 +1,5 @@
 import { hash } from "bcrypt"
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import prisma from "@/lib/prisma"
 
@@ -26,7 +26,7 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession()
     if (!session || session.user?.role !== "ADMIN") {
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
       email,
       password,
       role = "BARTENDER",
-    } = (await req.json()) as { email: string; password: string; role?: string }
+    } = (await request.json()) as { email: string; password: string; role?: string }
 
     if (!email || !password) {
       return new NextResponse("Missing required fields", { status: 400 })

@@ -1,10 +1,16 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 
-export async function GET(request: Request, { params }: { params: { tableId: string } }) {
+type RouteContext = {
+  params: Promise<{ tableId: string }>
+}
+
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
+    const { tableId } = await context.params
+
     const table = await db.table.findUnique({
-      where: { id: params.tableId },
+      where: { id: tableId },
       include: {
         orders: {
           where: {
