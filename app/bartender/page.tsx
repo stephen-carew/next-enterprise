@@ -17,13 +17,23 @@ interface SSEUpdate {
     order?: Order;
 }
 
+interface PaymentRequest {
+    id: string;
+    tableId: string;
+    amount: number;
+    status: "PENDING" | "CONFIRMED" | "REJECTED";
+    createdAt: Date;
+}
+
 export default function BartenderPage() {
     const [orders, setOrders] = useState<OrderWithTable[]>([]);
+    const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const eventSourceRef = useRef<EventSource | null>(null);
 
     useEffect(() => {
         fetchOrders();
+        fetchPaymentRequests();
 
         // Set up SSE connection
         eventSourceRef.current = new EventSource('/api/orders/events');
@@ -36,6 +46,12 @@ export default function BartenderPage() {
                 if (data.type === "connected") {
                     console.log("SSE connected");
                     return;
+                }
+
+                // Handle payment request updates
+                if (data.type === "payment-request") {
+                    console.log("Payment request update:", data);
+                    fetchPaymentRequests();
                 }
 
                 // Handle new order
@@ -134,9 +150,38 @@ export default function BartenderPage() {
         }
     };
 
+    const fetchPaymentRequests = async () => {
+        try {
+            const response = await fetch("/api/payment-requests");
+            if (!response.ok) throw new Error("Failed to fetch payment requests");
+            const data = await response.json() as PaymentRequest[];
+            setPaymentRequests(data);
+        } catch (error) {
+            console.error("Error fetching payment requests:", error);
+            toast.error("Failed to load payment requests");
+        }
+    };
+
     const updateOrderStatus = async (orderId: string, status: "PENDING" | "PREPARING" | "COMPLETED" | "CANCELLED") => {
         try {
             console.log("Updating order status:", { orderId, status });
+
+            // Optimistically update the UI
+            setOrders(prevOrders => {
+                const orderIndex = prevOrders.findIndex(order => order.id === orderId);
+                if (orderIndex === -1) return prevOrders;
+
+                const updatedOrders = [...prevOrders];
+                const existingOrder = updatedOrders[orderIndex];
+                if (!existingOrder) return prevOrders;
+
+                updatedOrders[orderIndex] = {
+                    ...existingOrder,
+                    status
+                };
+                return updatedOrders;
+            });
+
             const response = await fetch(`/api/orders/${orderId}`, {
                 method: "PATCH",
                 headers: {
@@ -148,6 +193,22 @@ export default function BartenderPage() {
             const data = await response.json() as { error?: string } | Order;
 
             if (!response.ok) {
+                // Revert the optimistic update if the request failed
+                setOrders(prevOrders => {
+                    const orderIndex = prevOrders.findIndex(order => order.id === orderId);
+                    if (orderIndex === -1) return prevOrders;
+
+                    const updatedOrders = [...prevOrders];
+                    const existingOrder = updatedOrders[orderIndex];
+                    if (!existingOrder) return prevOrders;
+
+                    updatedOrders[orderIndex] = {
+                        ...existingOrder,
+                        status: existingOrder.status // Revert to previous status
+                    };
+                    return updatedOrders;
+                });
+
                 throw new Error('error' in data ? data.error : "Failed to update order status");
             }
 
@@ -156,6 +217,26 @@ export default function BartenderPage() {
         } catch (error) {
             console.error("Error updating order status:", error);
             toast.error(error instanceof Error ? error.message : "Failed to update order status");
+        }
+    };
+
+    const handlePaymentConfirmation = async (requestId: string, confirm: boolean) => {
+        try {
+            const response = await fetch(`/api/payment-requests/${requestId}`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ status: confirm ? "CONFIRMED" : "REJECTED" }),
+            });
+
+            if (!response.ok) throw new Error("Failed to update payment request");
+
+            toast.success(confirm ? "Payment confirmed" : "Payment rejected");
+            fetchPaymentRequests();
+        } catch (error) {
+            console.error("Error updating payment request:", error);
+            toast.error("Failed to update payment request");
         }
     };
 
@@ -173,10 +254,51 @@ export default function BartenderPage() {
                             Bartender Dashboard
                         </h1>
                         <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-                            Manage and track drink orders in real-time
+                            Manage orders and payments
                         </p>
                     </motion.div>
 
+                    {/* Payment Requests Section */}
+                    {paymentRequests.length > 0 && (
+                        <div className="mb-8">
+                            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">
+                                Payment Requests
+                            </h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {paymentRequests.map((request) => (
+                                    <Card key={request.id} className="bg-white dark:bg-gray-800">
+                                        <CardHeader>
+                                            <CardTitle className="flex justify-between items-center">
+                                                <span>Table {request.tableId}</span>
+                                                <span className="text-lg font-bold">
+                                                    ${request.amount.toFixed(2)}
+                                                </span>
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    className="flex-1"
+                                                    onClick={() => handlePaymentConfirmation(request.id, true)}
+                                                >
+                                                    Confirm Payment
+                                                </Button>
+                                                <Button
+                                                    variant="destructive"
+                                                    className="flex-1"
+                                                    onClick={() => handlePaymentConfirmation(request.id, false)}
+                                                >
+                                                    Reject
+                                                </Button>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Existing Orders Section */}
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center py-16">
                             <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-300 dark:border-gray-700 border-t-primary"></div>

@@ -1,26 +1,55 @@
 import { NextResponse } from "next/server"
 import { db } from "../../../lib/db"
 
-export async function POST(request: Request) {
+export async function GET() {
   try {
-    const body = await request.json()
-    const { number } = body as { number: number }
-
-    // Try to find existing table
-    let table = await db.table.findUnique({
-      where: { number },
+    const tables = await db.table.findMany({
+      include: {
+        orders: {
+          where: {
+            status: {
+              notIn: ["COMPLETED", "CANCELLED"],
+            },
+          },
+          include: {
+            OrderDrink: {
+              include: {
+                Drink: true,
+              },
+            },
+          },
+        },
+      },
     })
 
-    // If table doesn't exist, create it
-    if (!table) {
-      table = await db.table.create({
-        data: { number },
-      })
-    }
+    // Calculate total owed for each table
+    const tablesWithTotals = tables.map((table) => ({
+      ...table,
+      totalOwed: table.orders.reduce((sum, order) => sum + order.total, 0),
+    }))
+
+    return NextResponse.json(tablesWithTotals)
+  } catch (error) {
+    console.error("Error fetching tables:", error)
+    return new NextResponse("Internal error", { status: 500 })
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = (await request.json()) as { number: number }
+    const { number } = body
+
+    const table = await db.table.create({
+      data: {
+        number,
+        status: "ACTIVE",
+      },
+    })
 
     return NextResponse.json(table)
   } catch (error) {
-    console.error("Failed to get/create table:", error)
-    return NextResponse.json({ error: "Failed to get/create table" }, { status: 500 })
+    console.error("Error creating table:", error)
+    return new NextResponse("Internal error", { status: 500 })
   }
 }

@@ -42,7 +42,28 @@ export function OrderSummary() {
             const table = await tableResponse.json() as { id: string };
             const tableId = table.id;
 
-            // Then create the order
+            // Check for existing active orders for this table
+            const existingOrdersResponse = await fetch("/api/orders");
+            if (!existingOrdersResponse.ok) {
+                throw new Error("Failed to fetch existing orders");
+            }
+
+            const existingOrders = await existingOrdersResponse.json() as Order[];
+            const activeOrder = existingOrders.find(
+                order =>
+                    order.tableId === tableId &&
+                    order.status !== "COMPLETED" &&
+                    order.status !== "CANCELLED"
+            );
+
+            if (activeOrder) {
+                // If there's an active order, redirect to it
+                toast.success("Found existing order for this table");
+                router.push(`/order-status/${activeOrder.id}`);
+                return;
+            }
+
+            // If no active order exists, create a new one
             const response = await fetch("/api/orders", {
                 method: "POST",
                 headers: {

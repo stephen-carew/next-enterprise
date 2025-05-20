@@ -1,0 +1,52 @@
+import { kv } from "@vercel/kv"
+import { NextResponse } from "next/server"
+import { db } from "../../../../../lib/db"
+
+export async function POST(request: Request, { params }: { params: { tableId: string } }) {
+  try {
+    const { tableId } = params
+
+    // Get table and its active orders
+    const table = await db.table.findUnique({
+      where: { id: tableId },
+      include: {
+        orders: {
+          where: {
+            status: {
+              notIn: ["COMPLETED", "CANCELLED"],
+            },
+          },
+        },
+      },
+    })
+
+    if (!table) {
+      return new NextResponse("Table not found", { status: 404 })
+    }
+
+    // Calculate total amount
+    const totalAmount = table.orders.reduce((sum, order) => sum + order.total, 0)
+
+    // Create payment request
+    const paymentRequest = await db.paymentRequest.create({
+      data: {
+        tableId,
+        amount: totalAmount,
+        status: "PENDING",
+      },
+    })
+
+    // Notify bartender through KV store
+    await kv.publish("payment-requests", {
+      type: "new",
+      paymentRequestId: paymentRequest.id,
+      tableId,
+      amount: totalAmount,
+    })
+
+    return NextResponse.json(paymentRequest)
+  } catch (error) {
+    console.error("Error creating payment request:", error)
+    return new NextResponse("Internal error", { status: 500 })
+  }
+}
