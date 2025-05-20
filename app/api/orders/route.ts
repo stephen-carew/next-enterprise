@@ -1,6 +1,6 @@
+import { kv } from "@vercel/kv"
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "../../../lib/db"
-import { pusherServer } from "../../../lib/pusher"
 import { CreateOrderRequest } from "../../../lib/types"
 
 export async function POST(request: NextRequest) {
@@ -42,8 +42,12 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Trigger Pusher event for new order
-    await pusherServer.trigger("orders", "new-order", order)
+    // Store in KV and publish update
+    await kv.set(`orders:${order.id}`, order)
+    await kv.publish("orders:update", {
+      type: "new-order",
+      order,
+    })
 
     return NextResponse.json(order)
   } catch (error) {
