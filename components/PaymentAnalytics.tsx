@@ -1,8 +1,8 @@
 "use client"
 
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Order } from "@/lib/types"
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 
 interface PaymentAnalyticsProps {
     orders: Order[]
@@ -130,7 +130,7 @@ export function PaymentAnalytics({ orders }: PaymentAnalyticsProps) {
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
-                        {stats.paymentMethodDistribution.map(({ method, count, percentage }) => (
+                        {stats.paymentMethodDistribution.map(({ method, percentage }) => (
                             <div key={method} className="space-y-2">
                                 <div className="flex justify-between text-sm">
                                     <span>{method}</span>
