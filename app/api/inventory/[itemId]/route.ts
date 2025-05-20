@@ -1,12 +1,17 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { InventoryItem } from "@/lib/types"
 
-export async function PATCH(req: Request, { params }: { params: { itemId: string } }) {
+type RouteContext = {
+  params: Promise<{ itemId: string }>
+}
+
+export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     const session = await getServerSession(authOptions)
+    const { itemId } = await context.params
 
     if (!session) {
       return new NextResponse("Unauthorized", { status: 401 })
@@ -16,7 +21,7 @@ export async function PATCH(req: Request, { params }: { params: { itemId: string
       return new NextResponse("Forbidden", { status: 403 })
     }
 
-    const body = (await req.json()) as { quantity: number }
+    const body = (await request.json()) as { quantity: number }
     const { quantity } = body
 
     if (typeof quantity !== "number") {
@@ -25,7 +30,7 @@ export async function PATCH(req: Request, { params }: { params: { itemId: string
 
     const item = await prisma.inventoryItem.findUnique({
       where: {
-        id: params.itemId,
+        id: itemId,
       },
       include: {
         alerts: {
@@ -42,7 +47,7 @@ export async function PATCH(req: Request, { params }: { params: { itemId: string
 
     const updatedItem = await prisma.inventoryItem.update({
       where: {
-        id: params.itemId,
+        id: itemId,
       },
       data: {
         quantity,
