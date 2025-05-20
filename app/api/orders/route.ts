@@ -1,11 +1,12 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { db } from "../../../lib/db"
 import { pusherServer } from "../../../lib/pusher"
 import { CreateOrderRequest } from "../../../lib/types"
-export async function POST(req: Request) {
+
+export async function POST(request: NextRequest) {
   try {
-    const body = await req.json()
-    const { tableId, items } = body as CreateOrderRequest
+    const body = (await request.json()) as CreateOrderRequest
+    const { tableId, items } = body
 
     if (!tableId) {
       return new NextResponse("Table ID is required", { status: 400 })

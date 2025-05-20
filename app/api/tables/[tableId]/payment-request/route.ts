@@ -1,10 +1,10 @@
 import { kv } from "@vercel/kv"
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { db } from "../../../../../lib/db"
 
-export async function POST(request: Request, { params }: { params: { tableId: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ tableId: string }> }) {
   try {
-    const { tableId } = params
+    const { tableId } = await params
 
     // Get table and its active orders
     const table = await db.table.findUnique({
