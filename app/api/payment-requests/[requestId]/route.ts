@@ -1,10 +1,10 @@
 import { kv } from "@vercel/kv"
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { db } from "../../../../lib/db"
 
-export async function PATCH(request: Request, { params }: { params: { requestId: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ requestId: string }> }) {
   try {
-    const { requestId } = params
+    const { requestId } = await params
     const body = (await request.json()) as { status: "CONFIRMED" | "REJECTED" }
     const { status } = body
 
