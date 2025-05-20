@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 
 interface OrderItem {
@@ -10,8 +10,13 @@ interface CreateOrderRequest {
   items: OrderItem[]
 }
 
-export async function POST(request: Request, { params }: { params: { tableId: string } }) {
+type RouteContext = {
+  params: Promise<{ tableId: string }>
+}
+
+export async function POST(request: NextRequest, context: RouteContext) {
   try {
+    const { tableId } = await context.params
     const body = (await request.json()) as CreateOrderRequest
     const { items } = body
 
@@ -34,7 +39,7 @@ export async function POST(request: Request, { params }: { params: { tableId: st
     // Create order with order drinks
     const order = await db.order.create({
       data: {
-        tableId: params.tableId,
+        tableId,
         total,
         OrderDrink: {
           create: items.map((item) => ({

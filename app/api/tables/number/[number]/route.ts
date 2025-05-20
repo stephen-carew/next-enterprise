@@ -1,9 +1,14 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 
-export async function GET(request: Request, { params }: { params: { number: string } }) {
+type RouteContext = {
+  params: Promise<{ number: string }>
+}
+
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const tableNumber = parseInt(params.number)
+    const { number } = await context.params
+    const tableNumber = parseInt(number)
 
     if (isNaN(tableNumber)) {
       return new NextResponse("Invalid table number", { status: 400 })

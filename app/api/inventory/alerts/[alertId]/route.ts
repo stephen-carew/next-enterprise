@@ -1,12 +1,17 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { InventoryAlert } from "@/lib/types"
 
-export async function PATCH(req: Request, { params }: { params: { alertId: string } }) {
+type RouteContext = {
+  params: Promise<{ alertId: string }>
+}
+
+export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     const session = await getServerSession(authOptions)
+    const { alertId } = await context.params
 
     if (!session) {
       return new NextResponse("Unauthorized", { status: 401 })
@@ -16,7 +21,7 @@ export async function PATCH(req: Request, { params }: { params: { alertId: strin
       return new NextResponse("Forbidden", { status: 403 })
     }
 
-    const body = (await req.json()) as { isResolved: boolean }
+    const body = (await request.json()) as { isResolved: boolean }
     const { isResolved } = body
 
     if (typeof isResolved !== "boolean") {
@@ -25,7 +30,7 @@ export async function PATCH(req: Request, { params }: { params: { alertId: strin
 
     const alert = await prisma.inventoryAlert.findUnique({
       where: {
-        id: params.alertId,
+        id: alertId,
       },
       include: {
         inventoryItem: true,
@@ -38,7 +43,7 @@ export async function PATCH(req: Request, { params }: { params: { alertId: strin
 
     const updatedAlert = await prisma.inventoryAlert.update({
       where: {
-        id: params.alertId,
+        id: alertId,
       },
       data: {
         isResolved,

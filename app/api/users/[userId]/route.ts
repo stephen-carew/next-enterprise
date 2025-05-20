@@ -1,15 +1,19 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import prisma from "@/lib/prisma"
 
-export async function DELETE(req: Request, { params }: { params: { userId: string } }) {
+type RouteContext = {
+  params: Promise<{ userId: string }>
+}
+
+export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
     const session = await getServerSession()
+    const { userId } = await context.params
+
     if (!session || session.user?.role !== "ADMIN") {
       return new NextResponse("Unauthorized", { status: 401 })
     }
-
-    const { userId } = params
 
     // Check if user exists
     const user = await prisma.user.findUnique({
