@@ -9,23 +9,14 @@ export async function GET() {
       where: {
         isAvailable: true,
       },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        price: true,
-        category: true,
-        imageUrl: true,
-        isAvailable: true,
-        createdAt: true,
-        updatedAt: true,
+      orderBy: {
+        category: "asc",
       },
     })
-    console.log("Found drinks:", drinks)
-    return NextResponse.json(drinks)
+    return NextResponse.json({ drinks })
   } catch (error) {
-    console.error("Failed to fetch drinks:", error)
-    return NextResponse.json({ error: "Failed to fetch drinks" }, { status: 500 })
+    console.error("Error fetching drinks:", error)
+    return new NextResponse("Internal Server Error", { status: 500 })
   }
 }
 

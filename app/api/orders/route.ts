@@ -1,6 +1,7 @@
-import { kv } from "@vercel/kv"
 import { NextRequest, NextResponse } from "next/server"
+import { sendUpdate } from "./events/route"
 import { db } from "../../../lib/db"
+import { redis } from "../../../lib/redis"
 import { CreateOrderRequest } from "../../../lib/types"
 
 export async function POST(request: NextRequest) {
@@ -23,6 +24,7 @@ export async function POST(request: NextRequest) {
     const order = await db.order.create({
       data: {
         tableId,
+        status: "PENDING",
         total,
         OrderDrink: {
           create: items.map((item) => ({
@@ -42,10 +44,18 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Store in KV and publish update
-    await kv.set(`orders:${order.id}`, order)
-    await kv.publish("orders:update", {
+    // Store in Redis and publish update
+    await redis.set(`orders:${order.id}`, order)
+    await redis.publish("orders:update", {
       type: "new-order",
+      order,
+    })
+
+    // Broadcast the new order to all connected clients
+    sendUpdate({
+      type: "new-order",
+      orderId: order.id,
+      status: order.status,
       order,
     })
 

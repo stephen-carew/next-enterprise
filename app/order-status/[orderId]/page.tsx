@@ -3,6 +3,7 @@
 import * as RadixDialog from "@radix-ui/react-dialog";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "../../../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card";
 import { Input } from "../../../components/ui/input";
@@ -15,6 +16,10 @@ interface SSEUpdate {
     order?: Order;
 }
 
+interface DrinksResponse {
+    drinks: Drink[];
+}
+
 export default function OrderStatusPage({ params }: { params: Promise<{ orderId: string }> }) {
     const [orderId, setOrderId] = useState<string>("");
     const [order, setOrder] = useState<Order | null>(null);
@@ -23,20 +28,23 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
     const [drinks, setDrinks] = useState<Drink[]>([]);
     const [editOrder, setEditOrder] = useState<{ [drinkId: string]: number }>({});
     const router = useRouter();
+    const { toast } = useToast();
     const eventSourceRef = useRef<EventSource | null>(null);
 
     useEffect(() => {
-        // Get orderId from params
-        params.then(({ orderId }) => {
+        const loadData = async () => {
+            const { orderId } = await params;
             setOrderId(orderId);
-        });
+            await Promise.all([
+                fetchOrder(orderId),
+                fetchDrinks(),
+            ]);
+        };
+        loadData();
     }, [params]);
 
     useEffect(() => {
         if (!orderId) return;
-
-        // Fetch initial order
-        fetchOrder();
 
         // Set up SSE connection
         eventSourceRef.current = new EventSource('/api/orders/events');
@@ -88,38 +96,119 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
         };
     }, [orderId, order]);
 
-    // Fetch drinks for modal
-    useEffect(() => {
-        if (editOpen) {
-            fetch("/api/drinks")
-                .then(res => res.json() as Promise<Drink[]>)
-                .then((data) => setDrinks(data));
-        }
-    }, [editOpen]);
-
-    // Initialize editOrder state when opening modal
-    useEffect(() => {
-        if (editOpen && order) {
-            const initial: { [drinkId: string]: number } = {};
-            order.OrderDrink.forEach(item => {
-                initial[item.drinkId] = item.quantity;
-            });
-            setEditOrder(initial);
-        }
-    }, [editOpen, order]);
-
-    const fetchOrder = async () => {
+    const fetchOrder = async (orderId: string) => {
         try {
             const response = await fetch(`/api/orders/${orderId}`);
-            if (!response.ok) {
-                throw new Error("Failed to fetch order");
-            }
+            if (!response.ok) throw new Error('Failed to fetch order');
             const data = await response.json();
             setOrder(data as Order);
         } catch (error) {
-            console.error("Failed to fetch order:", error);
+            console.error('Error fetching order:', error);
+            toast({
+                title: 'Error',
+                description: 'Failed to load order data',
+                variant: 'destructive',
+            });
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const fetchDrinks = async () => {
+        try {
+            const response = await fetch('/api/drinks');
+            if (!response.ok) throw new Error('Failed to fetch drinks');
+            const data = await response.json() as DrinksResponse;
+            if (!data.drinks || !Array.isArray(data.drinks)) {
+                console.error('Drinks data is not in expected format:', data);
+                setDrinks([]);
+                return;
+            }
+            setDrinks(data.drinks);
+        } catch (error) {
+            console.error('Error fetching drinks:', error);
+            toast({
+                title: 'Error',
+                description: 'Failed to load drinks',
+                variant: 'destructive',
+            });
+            setDrinks([]);
+        }
+    };
+
+    const handleUpdateOrder = async () => {
+        if (!order) return;
+
+        try {
+            const items = Object.entries(editOrder)
+                .filter(([_, quantity]) => quantity > 0)
+                .map(([drinkId, quantity]) => {
+                    const drink = drinks.find(d => d.id === drinkId);
+                    return {
+                        drinkId,
+                        quantity,
+                        price: drink?.price || 0,
+                    };
+                });
+
+            const response = await fetch(`/api/orders/${order.id}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    items,
+                }),
+            });
+
+            if (!response.ok) throw new Error('Failed to update order');
+
+            toast({
+                title: 'Success',
+                description: 'Order updated successfully',
+            });
+
+            setEditOpen(false);
+            await fetchOrder(order.id);
+        } catch (error) {
+            console.error('Error updating order:', error);
+            toast({
+                title: 'Error',
+                description: 'Failed to update order',
+                variant: 'destructive',
+            });
+        }
+    };
+
+    const handleCancelOrder = async () => {
+        if (!order) return;
+
+        try {
+            const response = await fetch(`/api/orders/${order.id}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    status: 'CANCELLED',
+                }),
+            });
+
+            if (!response.ok) throw new Error('Failed to cancel order');
+
+            toast({
+                title: 'Success',
+                description: 'Order cancelled successfully',
+            });
+
+            router.push(`/tables/${order.tableId}`);
+        } catch (error) {
+            console.error('Error cancelling order:', error);
+            toast({
+                title: 'Error',
+                description: 'Failed to cancel order',
+                variant: 'destructive',
+            });
         }
     };
 
@@ -147,7 +236,7 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
             <div className="min-h-screen w-full bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
                 <div className="max-w-2xl w-full px-4 py-8 mx-auto">
                     <div className="flex flex-col items-center justify-center py-16">
-                        <div className="animate-spin rounded-full h-16 w-16 border-4 border-fuchsia-500 border-t-transparent"></div>
+                        <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-900 border-t-transparent"></div>
                         <p className="mt-6 text-lg text-muted-foreground">Loading order status...</p>
                     </div>
                 </div>
@@ -215,6 +304,12 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
                         <>
                             <Button
                                 variant="outline"
+                                onClick={() => router.push(`/tables/${order.tableId}`)}
+                            >
+                                Back to Table
+                            </Button>
+                            <Button
+                                variant="outline"
                                 onClick={() => setEditOpen(true)}
                                 disabled={isOrderCompleted}
                             >
@@ -223,6 +318,7 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
                             <Button
                                 variant="destructive"
                                 disabled={isOrderCompleted}
+                                onClick={handleCancelOrder}
                             >
                                 Cancel Order
                             </Button>
@@ -237,7 +333,10 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
                             <div className="py-4 text-gray-700 dark:text-gray-300 space-y-4 max-h-[60vh] overflow-y-auto">
                                 {drinks.map(drink => (
                                     <div key={drink.id} className="flex items-center justify-between gap-4 border-b border-gray-100 dark:border-gray-700 py-2">
-                                        <span>{drink.name}</span>
+                                        <div className="flex flex-col">
+                                            <span>{drink.name}</span>
+                                            <span className="text-sm text-gray-500 dark:text-gray-400">${drink.price.toFixed(2)}</span>
+                                        </div>
                                         <div className="flex items-center gap-2">
                                             <Button size="sm" variant="outline" onClick={() => setEditOrder(o => ({ ...o, [drink.id]: Math.max((o[drink.id] || 0) - 1, 0) }))}>-</Button>
                                             <Input
@@ -256,7 +355,7 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
                                 <RadixDialog.Close asChild>
                                     <Button variant="outline">Cancel</Button>
                                 </RadixDialog.Close>
-                                <Button onClick={() => {/* TODO: Save logic */ }}>Save Changes</Button>
+                                <Button onClick={handleUpdateOrder}>Save Changes</Button>
                             </div>
                         </RadixDialog.Content>
                     </RadixDialog.Portal>

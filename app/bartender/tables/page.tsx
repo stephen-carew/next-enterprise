@@ -1,23 +1,41 @@
-"use client";
+'use client';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Order, Table } from '@/types/table';
 
-import { useEffect, useState } from "react";
-import toast from "react-hot-toast";
-import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { Order, Table } from "../../lib/types";
+
 
 interface TableWithOrders extends Table {
     orders: Order[];
     totalOwed: number;
 }
 
-export default function TablesPage() {
+export default function BartenderTablesPage() {
     const [tables, setTables] = useState<TableWithOrders[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const router = useRouter();
 
     useEffect(() => {
-        fetchTables();
-    }, []);
+        // Check if user is authenticated as bartender
+        const checkAuth = async () => {
+            try {
+                const response = await fetch('/api/auth/check-bartender');
+                if (!response.ok) {
+                    router.push('/login');
+                    return;
+                }
+                fetchTables();
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                router.push('/login');
+            }
+        };
+        checkAuth();
+    }, [router]);
 
     const fetchTables = async () => {
         try {
@@ -85,9 +103,9 @@ export default function TablesPage() {
                                                 </span>
                                             </div>
                                             <div className="text-sm text-gray-500 dark:text-gray-400">
-                                                {order.OrderDrink.map((item) => (
+                                                {order.OrderDrink?.map((item) => (
                                                     <div key={item.id}>
-                                                        {item.quantity}x {item.Drink.name}
+                                                        {item.quantity}x {item.Drink?.name}
                                                     </div>
                                                 ))}
                                             </div>
@@ -101,6 +119,9 @@ export default function TablesPage() {
                                             Request Payment
                                         </Button>
                                     )}
+                                    <Link href={`/bartender/tables/${table.id}`} className="block mt-2 text-center text-blue-600 hover:underline">
+                                        View Table Details
+                                    </Link>
                                 </div>
                             </CardContent>
                         </Card>

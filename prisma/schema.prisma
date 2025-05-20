@@ -67,9 +67,50 @@ model PaymentRequest {
     @@index([tableId])
 }
 
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      String   @default("USER")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 enum OrderStatus {
   PENDING
   PREPARING
   COMPLETED
   CANCELLED
+}
+
+model InventoryItem {
+    id          String   @id @default(cuid())
+    name        String
+    description String?
+    quantity    Float
+    unit        String   // e.g., "ml", "oz", "bottles", "cans"
+    minQuantity Float    // Minimum quantity before alert
+    category    String   // e.g., "Spirits", "Beer", "Wine", "Mixers", "Garnishes"
+    supplier    String?
+    price       Float    // Cost per unit
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+    alerts      InventoryAlert[]
+}
+
+model InventoryAlert {
+    id              String         @id @default(cuid())
+    inventoryItem   InventoryItem  @relation(fields: [inventoryItemId], references: [id])
+    inventoryItemId String
+    type            AlertType      // LOW_STOCK, OUT_OF_STOCK, EXPIRING
+    message         String
+    isResolved      Boolean        @default(false)
+    createdAt       DateTime       @default(now())
+    resolvedAt      DateTime?
+}
+
+enum AlertType {
+    LOW_STOCK
+    OUT_OF_STOCK
+    EXPIRING
 }

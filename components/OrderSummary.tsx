@@ -1,6 +1,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import toast from "react-hot-toast";
+import { PaymentMethods } from "@/components/PaymentMethods";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { useOrderStore } from "../lib/store";
@@ -9,6 +10,7 @@ import { Order } from "../lib/types";
 export function OrderSummary() {
     const { items, tableNumber, clearOrder } = useOrderStore();
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showPayment, setShowPayment] = useState(false);
     const router = useRouter();
 
     const total = items.reduce((sum: number, item) => sum + item.price * item.quantity, 0);
@@ -21,6 +23,16 @@ export function OrderSummary() {
 
         if (items.length === 0) {
             toast.error("Please add items to your order");
+            return;
+        }
+
+        setShowPayment(true);
+    };
+
+    const handlePaymentComplete = async (paymentId: string, paymentStatus: "PAID" | "FAILED") => {
+        if (paymentStatus === "FAILED") {
+            toast.error("Payment failed. Please try again.");
+            setShowPayment(false);
             return;
         }
 
@@ -71,6 +83,8 @@ export function OrderSummary() {
                 },
                 body: JSON.stringify({
                     tableId,
+                    paymentId,
+                    paymentStatus,
                     items: items.map((item) => ({
                         drinkId: item.drinkId,
                         quantity: item.quantity,
@@ -97,6 +111,16 @@ export function OrderSummary() {
 
     if (items.length === 0) {
         return null;
+    }
+
+    if (showPayment) {
+        return (
+            <PaymentMethods
+                total={total}
+                onPaymentComplete={handlePaymentComplete}
+                onCancel={() => setShowPayment(false)}
+            />
+        );
     }
 
     return (
@@ -128,7 +152,7 @@ export function OrderSummary() {
                         onClick={handleSubmitOrder}
                         disabled={isSubmitting}
                     >
-                        {isSubmitting ? "Submitting..." : "Submit Order"}
+                        {isSubmitting ? "Processing..." : "Proceed to Payment"}
                     </Button>
                 </div>
             </CardContent>

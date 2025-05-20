@@ -15,7 +15,7 @@ export interface OrderDrink {
   orderId: string
   drinkId: string
   quantity: number
-  notes?: string
+  notes: string | null
   createdAt: Date
   updatedAt: Date
   Drink: Drink
@@ -37,12 +37,25 @@ export interface Table {
 export interface Order {
   id: string
   tableId: string
-  status: "PENDING" | "PREPARING" | "COMPLETED" | "CANCELLED"
+  paymentId: string
+  paymentStatus: "PENDING" | "PAID" | "FAILED" | "REFUNDED"
+  paymentMethod: "CARD" | "APPLE_PAY" | "GOOGLE_PAY" | "CASH"
+  paymentDetails?: {
+    last4?: string
+    cardType?: string
+    expiryDate?: string
+  }
+  status: "PENDING" | "PREPARING" | "READY" | "COMPLETED" | "CANCELLED"
   total: number
+  items: {
+    drinkId: string
+    quantity: number
+    price: number
+  }[]
   OrderDrink: OrderDrink[]
   table: Table
-  createdAt: Date
-  updatedAt: Date
+  createdAt: string
+  updatedAt: string
 }
 
 export interface CreateDrinkRequest {
@@ -80,4 +93,30 @@ export interface CreateOrderItem {
 
 export interface UpdateOrderRequest {
   status: string
+}
+
+export interface InventoryItem {
+  id: string
+  name: string
+  description?: string
+  quantity: number
+  unit: string
+  minQuantity: number
+  category: string
+  supplier?: string
+  price: number
+  createdAt: Date
+  updatedAt: Date
+  alerts?: InventoryAlert[]
+}
+
+export interface InventoryAlert {
+  id: string
+  inventoryItemId: string
+  type: "LOW_STOCK" | "OUT_OF_STOCK" | "EXPIRING"
+  message: string
+  isResolved: boolean
+  createdAt: Date
+  resolvedAt?: Date
+  inventoryItem?: InventoryItem
 }

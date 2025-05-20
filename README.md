@@ -1,14 +1,12 @@
-### Next.js Enterprise Boilerplate
-
-</br>
+# Next.js Enterprise Boilerplate
 
 [![GitHub Actions Workflow Status][check-workflow-badge]][check-workflow-badge-link] [![GitHub License][github-license-badge]][github-license-badge-link] [![GitHub contributors][github-contributors-badge]][github-contributors-badge-link] [![Discord][discord-badge]][discord-badge-link] [![Blazity][made-by-blazity-badge]][made-by-blazity-badge-link]
 
 Welcome to the _Next.js Enterprise Boilerplate_, an open-source template for enterprise projects! It's loaded with features that'll help you build a high-performance, maintainable, and enjoyable app. We've done all the heavy lifting for you, so sit back, relax, and get ready to conquer the world with your incredible app! 🌍
 
-> [!NOTE] > **Blazity** is a group of Next.js/Headless experts. Contact us at [contact@blazity.com](https://blazity.com) if you’d like to talk about your project or just to have a chat with us
+> [!NOTE] > **Blazity** is a group of Next.js/Headless experts. Contact us at [contact@blazity.com](https://blazity.com) if you'd like to talk about your project or just to have a chat with us
 
-### Integrated features
+## Integrated features
 
 With this template you will get all the awesomeness you need:
 
@@ -39,18 +37,17 @@ With this template you will get all the awesomeness you need:
 
 **nefi** (next-enterprise feature integrations) is an AI agent that will help configuring the boilerplate to your needs using natural language. It can remove/install dependencies, modify files, manage git and integrate various solutions into your project.
 
-Simply set up the boilerplate, follow guide [in the getting started section](#getting-started) and type `npx nefi` in your terminal!
+Simply set up the boilerplate, follow guide [in the getting started section](#-getting-started) and type `npx nefi` in your terminal!
 
 Here's an example video of [nefi](https://nefi.ai/) integrating [Clerk](https://clerk.com/) auth solutions with one command, no API keys and no manual configuration needed!
 
-https://github.com/user-attachments/assets/5c13a110-7389-4859-909f-60a7f623e47d
+<https://github.com/user-attachments/assets/5c13a110-7389-4859-909f-60a7f623e47d>
 
 Leave a ⭐ for [nefi on GitHub](https://github.com/blazity/nefi) and check out the [nefi.ai docs](https://nefi.ai/)!
 
 ## Table of Contents
 
 - [Next.js Enterprise Boilerplate](#nextjs-enterprise-boilerplate)
-  - [Features](#features)
   - [Table of Contents](#table-of-contents)
   - [Getting Started](#-getting-started)
   - [Deployment](#-deployment)
@@ -153,7 +150,7 @@ This boilerplate comes with various testing setups to ensure your application's 
 - **End-to-end tests (headless mode)**: Run Playwright tests in headless mode with `pnpm run e2e:headless`
 - **End-to-end tests (UI mode)**: Run Playwright tests with UI using `pnpm run e2e:ui`
 
-<img width="1392" alt="image" src="https://user-images.githubusercontent.com/28964599/233666655-93b7d08b-2fd8-406a-b43c-44d4d96cf387.png">
+![Playwright UI Tests](https://user-images.githubusercontent.com/28964599/233666655-93b7d08b-2fd8-406a-b43c-44d4d96cf387.png)
 
 ### Acceptance Tests
 
@@ -227,7 +224,7 @@ Choose the library that best fits your requirements and project structure to ens
 
 ## 💻 Environment Variables handling
 
-[T3 Env](https://env.t3.gg/) is a library that provides environmental variables checking at build time, type validation and transforming. It ensures that your application is using the correct environment variables and their values are of the expected type. You’ll never again struggle with runtime errors caused by incorrect environment variable usage.
+[T3 Env](https://env.t3.gg/) is a library that provides environmental variables checking at build time, type validation and transforming. It ensures that your application is using the correct environment variables and their values are of the expected type. You'll never again struggle with runtime errors caused by incorrect environment variable usage.
 
 Config file is located at `env.mjs`. Simply set your client and server variables and import `env` from any file in your project.
 
@@ -269,11 +266,7 @@ Contributions are always welcome! To contribute, please follow these steps:
 
 If you're looking for help or simply want to share your thoughts about the project, we encourage you to join our Discord community. Here's the link: [https://blazity.com/discord](https://blazity.com/discord). It's a space where we exchange ideas and help one another. Everyone's input is appreciated, and we look forward to welcoming you.
 
-<br />
-<a href="https://discord.gg/fyWtyNKmfX" style="width: 100%; display: flex; justify-content: center;">
-  <img src="https://discordapp.com/api/guilds/1111676875782234175/widget.png?style=banner2" alt="Blazity Discord Banner"/>
-</a>
-<br />
+[![Blazity Discord Banner](https://discordapp.com/api/guilds/1111676875782234175/widget.png?style=banner2)](https://discord.gg/fyWtyNKmfX)
 
 ## 📜 License
 

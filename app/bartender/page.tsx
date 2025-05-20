@@ -1,39 +1,53 @@
 "use client"
 import { motion } from "framer-motion";
+import { Shield } from "lucide-react";
+import Link from "next/link";
+import { signOut } from "next-auth/react"
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { Order, OrderDrink } from "../../lib/types";
+import { PaymentHistory } from "@/components/PaymentHistory";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Order, OrderDrink } from "@/lib/types";
 
 interface OrderWithTable extends Order {
     tableNumber: number;
 }
 
 interface SSEUpdate {
-    type?: "connected";
+    type?: "connected" | "new-order" | "status-update" | "payment-update";
     orderId?: string;
     status?: Order["status"];
+    paymentStatus?: Order["paymentStatus"];
     order?: Order;
-}
-
-interface PaymentRequest {
-    id: string;
-    tableId: string;
-    amount: number;
-    status: "PENDING" | "CONFIRMED" | "REJECTED";
-    createdAt: Date;
 }
 
 export default function BartenderPage() {
     const [orders, setOrders] = useState<OrderWithTable[]>([]);
-    const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [paymentStatusFilter, setPaymentStatusFilter] = useState<Order["paymentStatus"] | "ALL">("ALL");
+    const [userRole, setUserRole] = useState<string>("");
     const eventSourceRef = useRef<EventSource | null>(null);
 
     useEffect(() => {
+        // Fetch user role
+        const fetchUserRole = async () => {
+            try {
+                const response = await fetch("/api/auth/check-admin");
+                if (response.ok) {
+                    setUserRole("ADMIN");
+                } else {
+                    setUserRole("BARTENDER");
+                }
+            } catch (error) {
+                console.error("Error fetching user role:", error);
+                setUserRole("BARTENDER");
+            }
+        };
+
+        fetchUserRole();
         fetchOrders();
-        fetchPaymentRequests();
 
         // Set up SSE connection
         eventSourceRef.current = new EventSource('/api/orders/events');
@@ -48,14 +62,8 @@ export default function BartenderPage() {
                     return;
                 }
 
-                // Handle payment request updates
-                if (data.type === "payment-request") {
-                    console.log("Payment request update:", data);
-                    fetchPaymentRequests();
-                }
-
                 // Handle new order
-                if (data.order && !data.status) {
+                if (data.type === "new-order" && data.order) {
                     console.log("New order received:", data.order);
                     setOrders(prevOrders => {
                         const orderWithTable: OrderWithTable = {
@@ -64,6 +72,27 @@ export default function BartenderPage() {
                         };
                         return [orderWithTable, ...prevOrders];
                     });
+                    return;
+                }
+
+                // Handle payment status updates
+                if (data.type === "payment-update" && data.orderId && data.paymentStatus) {
+                    console.log("Payment status update:", { orderId: data.orderId, paymentStatus: data.paymentStatus });
+                    setOrders(prevOrders => {
+                        const orderIndex = prevOrders.findIndex(order => order.id === data.orderId);
+                        if (orderIndex === -1) return prevOrders;
+
+                        const updatedOrders = [...prevOrders];
+                        const existingOrder = updatedOrders[orderIndex];
+                        if (!existingOrder) return prevOrders;
+
+                        updatedOrders[orderIndex] = {
+                            ...existingOrder,
+                            paymentStatus: data.paymentStatus!
+                        };
+                        return updatedOrders;
+                    });
+                    return;
                 }
 
                 // Handle status updates
@@ -86,7 +115,7 @@ export default function BartenderPage() {
                 }
 
                 // Handle full order updates
-                if (data.order && data.status) {
+                if (data.order) {
                     console.log("Full order update received:", data.order);
                     setOrders(prevOrders => {
                         const orderIndex = prevOrders.findIndex(order => order.id === data.order!.id);
@@ -150,100 +179,153 @@ export default function BartenderPage() {
         }
     };
 
-    const fetchPaymentRequests = async () => {
+    const handleStatusChange = async (orderId: string, newStatus: Order["status"]) => {
         try {
-            const response = await fetch("/api/payment-requests");
-            if (!response.ok) throw new Error("Failed to fetch payment requests");
-            const data = await response.json() as PaymentRequest[];
-            setPaymentRequests(data);
-        } catch (error) {
-            console.error("Error fetching payment requests:", error);
-            toast.error("Failed to load payment requests");
-        }
-    };
-
-    const updateOrderStatus = async (orderId: string, status: "PENDING" | "PREPARING" | "COMPLETED" | "CANCELLED") => {
-        try {
-            console.log("Updating order status:", { orderId, status });
-
-            // Optimistically update the UI
-            setOrders(prevOrders => {
-                const orderIndex = prevOrders.findIndex(order => order.id === orderId);
-                if (orderIndex === -1) return prevOrders;
-
-                const updatedOrders = [...prevOrders];
-                const existingOrder = updatedOrders[orderIndex];
-                if (!existingOrder) return prevOrders;
-
-                updatedOrders[orderIndex] = {
-                    ...existingOrder,
-                    status
-                };
-                return updatedOrders;
-            });
-
             const response = await fetch(`/api/orders/${orderId}`, {
                 method: "PATCH",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ status }),
+                body: JSON.stringify({ status: newStatus }),
             });
 
-            const data = await response.json() as { error?: string } | Order;
-
             if (!response.ok) {
-                // Revert the optimistic update if the request failed
-                setOrders(prevOrders => {
-                    const orderIndex = prevOrders.findIndex(order => order.id === orderId);
-                    if (orderIndex === -1) return prevOrders;
-
-                    const updatedOrders = [...prevOrders];
-                    const existingOrder = updatedOrders[orderIndex];
-                    if (!existingOrder) return prevOrders;
-
-                    updatedOrders[orderIndex] = {
-                        ...existingOrder,
-                        status: existingOrder.status // Revert to previous status
-                    };
-                    return updatedOrders;
-                });
-
-                throw new Error('error' in data ? data.error : "Failed to update order status");
+                throw new Error("Failed to update order status");
             }
 
-            console.log("Order updated successfully:", data);
-            toast.success(`Order marked as ${status.toLowerCase()}`);
+            setOrders(prevOrders =>
+                prevOrders.map(order =>
+                    order.id === orderId
+                        ? { ...order, status: newStatus }
+                        : order
+                )
+            );
+
+            toast.success(`Order status updated to ${newStatus.toLowerCase()}`);
         } catch (error) {
             console.error("Error updating order status:", error);
-            toast.error(error instanceof Error ? error.message : "Failed to update order status");
+            toast.error("Failed to update order status");
         }
     };
 
-    const handlePaymentConfirmation = async (requestId: string, confirm: boolean) => {
+    const handleRefund = async (orderId: string) => {
         try {
-            const response = await fetch(`/api/payment-requests/${requestId}`, {
-                method: "PATCH",
+            const response = await fetch(`/api/orders/${orderId}/refund`, {
+                method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ status: confirm ? "CONFIRMED" : "REJECTED" }),
             });
 
-            if (!response.ok) throw new Error("Failed to update payment request");
+            if (!response.ok) {
+                throw new Error("Failed to process refund");
+            }
 
-            toast.success(confirm ? "Payment confirmed" : "Payment rejected");
-            fetchPaymentRequests();
+            // Update the order's payment status
+            setOrders(prevOrders =>
+                prevOrders.map(order =>
+                    order.id === orderId
+                        ? { ...order, paymentStatus: "REFUNDED" }
+                        : order
+                )
+            );
+
+            toast.success("Refund processed successfully");
         } catch (error) {
-            console.error("Error updating payment request:", error);
-            toast.error("Failed to update payment request");
+            console.error("Error processing refund:", error);
+            toast.error("Failed to process refund");
+            throw error; // Re-throw to be handled by the PaymentHistory component
         }
     };
+
+    const handleCashPaymentConfirmation = async (orderId: string) => {
+        try {
+            const response = await fetch(`/api/orders/${orderId}/confirm-cash-payment`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error("Failed to confirm cash payment");
+            }
+
+            // Update the order's payment status
+            setOrders(prevOrders =>
+                prevOrders.map(order =>
+                    order.id === orderId
+                        ? { ...order, paymentStatus: "PAID" }
+                        : order
+                )
+            );
+
+            toast.success("Cash payment confirmed");
+        } catch (error) {
+            console.error("Error confirming cash payment:", error);
+            toast.error("Failed to confirm cash payment");
+        }
+    };
+
+    const handleSignOut = async () => {
+        await signOut({ callbackUrl: "/login" })
+    }
+
+    const getStatusVariant = (status: Order["status"]) => {
+        switch (status) {
+            case "PENDING":
+                return "default";
+            case "PREPARING":
+                return "destructive";
+            case "COMPLETED":
+                return "success";
+            case "CANCELLED":
+                return "destructive";
+            default:
+                return "default";
+        }
+    };
+
+    const getPaymentStatusVariant = (status: Order["paymentStatus"]) => {
+        switch (status) {
+            case "PAID":
+                return "success";
+            case "PENDING":
+                return "default";
+            case "FAILED":
+                return "destructive";
+            case "REFUNDED":
+                return "secondary";
+            default:
+                return "default";
+        }
+    };
+
+    const filteredOrders = orders.filter(order =>
+        paymentStatusFilter === "ALL" ||
+        (paymentStatusFilter === "PENDING" && (!order.paymentStatus || order.paymentStatus === "PENDING")) ||
+        order.paymentStatus === paymentStatusFilter
+    );
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
             <div className="container mx-auto px-4 py-8 md:py-12">
                 <div className="max-w-7xl mx-auto">
+                    <div className="flex justify-between items-center mb-8">
+                        <div className="flex items-center gap-4">
+                            {userRole === "ADMIN" && (
+                                <Link href="/admin">
+                                    <Button variant="outline" className="flex items-center gap-2">
+                                        <Shield className="h-4 w-4" />
+                                        Switch to Admin Dashboard
+                                    </Button>
+                                </Link>
+                            )}
+                        </div>
+                        <Button variant="outline" onClick={handleSignOut}>
+                            Sign Out
+                        </Button>
+                    </div>
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -258,45 +340,79 @@ export default function BartenderPage() {
                         </p>
                     </motion.div>
 
-                    {/* Payment Requests Section */}
-                    {paymentRequests.length > 0 && (
+                    {/* Pending Cash Payments Section */}
+                    {orders.some(order => order.paymentMethod === "CASH" && order.paymentStatus === "PENDING") && (
                         <div className="mb-8">
                             <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">
-                                Payment Requests
+                                Pending Cash Payments
                             </h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {paymentRequests.map((request) => (
-                                    <Card key={request.id} className="bg-white dark:bg-gray-800">
-                                        <CardHeader>
-                                            <CardTitle className="flex justify-between items-center">
-                                                <span>Table {request.tableId}</span>
-                                                <span className="text-lg font-bold">
-                                                    ${request.amount.toFixed(2)}
-                                                </span>
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="flex gap-2">
-                                                <Button
-                                                    className="flex-1"
-                                                    onClick={() => handlePaymentConfirmation(request.id, true)}
-                                                >
-                                                    Confirm Payment
-                                                </Button>
-                                                <Button
-                                                    variant="destructive"
-                                                    className="flex-1"
-                                                    onClick={() => handlePaymentConfirmation(request.id, false)}
-                                                >
-                                                    Reject
-                                                </Button>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                ))}
+                                {orders
+                                    .filter(order => order.paymentMethod === "CASH" && order.paymentStatus === "PENDING")
+                                    .map((order) => (
+                                        <Card key={order.id} className="bg-white dark:bg-gray-800">
+                                            <CardHeader>
+                                                <CardTitle className="flex justify-between items-center">
+                                                    <span>Table {order.tableNumber}</span>
+                                                    <span className="text-lg font-bold">
+                                                        ${order.total.toFixed(2)}
+                                                    </span>
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="space-y-4">
+                                                    <div className="text-sm text-muted-foreground">
+                                                        Payment ID: {order.paymentId}
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <Button
+                                                            className="flex-1"
+                                                            onClick={() => handleCashPaymentConfirmation(order.id)}
+                                                        >
+                                                            Confirm Cash Payment
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    ))}
                             </div>
                         </div>
                     )}
+
+                    {/* Payment Status Filter */}
+                    <div className="mb-6 flex gap-2">
+                        <Button
+                            variant={paymentStatusFilter === "ALL" ? "default" : "outline"}
+                            onClick={() => setPaymentStatusFilter("ALL")}
+                        >
+                            All
+                        </Button>
+                        <Button
+                            variant={paymentStatusFilter === "PAID" ? "default" : "outline"}
+                            onClick={() => setPaymentStatusFilter("PAID")}
+                        >
+                            Paid
+                        </Button>
+                        <Button
+                            variant={paymentStatusFilter === "PENDING" ? "default" : "outline"}
+                            onClick={() => setPaymentStatusFilter("PENDING")}
+                        >
+                            Pending
+                        </Button>
+                        <Button
+                            variant={paymentStatusFilter === "FAILED" ? "default" : "outline"}
+                            onClick={() => setPaymentStatusFilter("FAILED")}
+                        >
+                            Failed
+                        </Button>
+                        <Button
+                            variant={paymentStatusFilter === "REFUNDED" ? "default" : "outline"}
+                            onClick={() => setPaymentStatusFilter("REFUNDED")}
+                        >
+                            Refunded
+                        </Button>
+                    </div>
 
                     {/* Existing Orders Section */}
                     {isLoading ? (
@@ -304,7 +420,7 @@ export default function BartenderPage() {
                             <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-300 dark:border-gray-700 border-t-primary"></div>
                             <p className="mt-6 text-lg text-gray-600 dark:text-gray-400">Loading orders...</p>
                         </div>
-                    ) : orders.length === 0 ? (
+                    ) : filteredOrders.length === 0 ? (
                         <div className="text-center py-16">
                             <Card className="max-w-md mx-auto bg-white dark:bg-gray-800">
                                 <CardContent className="pt-6">
@@ -314,74 +430,80 @@ export default function BartenderPage() {
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {orders.map((order) => (
-                                <motion.div
-                                    key={order.id}
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.95 }}
-                                    transition={{ duration: 0.3 }}
-                                >
-                                    <Card className="bg-white dark:bg-gray-800">
-                                        <CardHeader>
-                                            <CardTitle className="flex items-center justify-between">
-                                                <span className="text-gray-900 dark:text-gray-100">Table {order.tableNumber}</span>
-                                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${order.status === "PENDING"
-                                                    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                                                    : order.status === "PREPARING"
-                                                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                                                        : order.status === "COMPLETED"
-                                                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                                            : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                                                    }`}>
-                                                    {order.status.charAt(0) + order.status.slice(1).toLowerCase()}
-                                                </span>
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-4">
-                                                <div className="space-y-2">
-                                                    {order.OrderDrink.map((item: OrderDrink) => (
-                                                        <div
-                                                            key={item.id}
-                                                            className="flex items-center justify-between py-2 border-b border-gray-200 dark:border-gray-700 last:border-0"
-                                                        >
-                                                            <span className="text-sm text-gray-700 dark:text-gray-300">{item.Drink.name}</span>
-                                                            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">x{item.quantity}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                                <div className="flex flex-col gap-2">
-                                                    {order.status === "PENDING" && (
-                                                        <Button
-                                                            className="w-full"
-                                                            onClick={() => updateOrderStatus(order.id, "PREPARING")}
-                                                        >
-                                                            Start Preparing
-                                                        </Button>
-                                                    )}
-                                                    {order.status === "PREPARING" && (
-                                                        <Button
-                                                            className="w-full"
-                                                            onClick={() => updateOrderStatus(order.id, "COMPLETED")}
-                                                        >
-                                                            Mark as Completed
-                                                        </Button>
-                                                    )}
-                                                    {order.status !== "COMPLETED" && order.status !== "CANCELLED" && (
-                                                        <Button
-                                                            variant="destructive"
-                                                            className="w-full"
-                                                            onClick={() => updateOrderStatus(order.id, "CANCELLED")}
-                                                        >
-                                                            Cancel Order
-                                                        </Button>
-                                                    )}
-                                                </div>
+                            {filteredOrders.map((order) => (
+                                <Card key={order.id} className="mb-4">
+                                    <CardHeader>
+                                        <div className="flex justify-between items-center">
+                                            <CardTitle>Table {order.table.number}</CardTitle>
+                                            <Badge variant={getStatusVariant(order.status)}>
+                                                {order.status}
+                                            </Badge>
+                                        </div>
+                                        <div className="flex justify-between items-center mt-2">
+                                            <div className="text-sm text-muted-foreground">
+                                                Payment ID: {order.paymentId}
                                             </div>
-                                        </CardContent>
-                                    </Card>
-                                </motion.div>
+                                            <Badge variant={getPaymentStatusVariant(order.paymentStatus)}>
+                                                {order.paymentStatus}
+                                            </Badge>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="space-y-4">
+                                            <div className="space-y-2">
+                                                {order.OrderDrink.map((item: OrderDrink) => (
+                                                    <div
+                                                        key={item.id}
+                                                        className="flex items-center justify-between py-2 border-b border-gray-200 dark:border-gray-700 last:border-0"
+                                                    >
+                                                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                                                            {item.Drink.name}
+                                                        </span>
+                                                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                                            x{item.quantity}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <PaymentHistory order={order} onRefund={handleRefund} />
+                                            <div className="flex flex-col gap-2">
+                                                {order.status === "PENDING" && (
+                                                    <Button
+                                                        onClick={() => handleStatusChange(order.id, "PREPARING")}
+                                                        className="w-full"
+                                                    >
+                                                        Start Preparing
+                                                    </Button>
+                                                )}
+                                                {order.status === "PREPARING" && (
+                                                    <Button
+                                                        onClick={() => handleStatusChange(order.id, "READY")}
+                                                        className="w-full"
+                                                    >
+                                                        Mark as Ready
+                                                    </Button>
+                                                )}
+                                                {order.status === "READY" && (
+                                                    <Button
+                                                        onClick={() => handleStatusChange(order.id, "COMPLETED")}
+                                                        className="w-full"
+                                                    >
+                                                        Complete Order
+                                                    </Button>
+                                                )}
+                                                {order.status !== "COMPLETED" && order.status !== "CANCELLED" && (
+                                                    <Button
+                                                        variant="destructive"
+                                                        onClick={() => handleStatusChange(order.id, "CANCELLED")}
+                                                        className="w-full"
+                                                    >
+                                                        Cancel Order
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             ))}
                         </div>
                     )}

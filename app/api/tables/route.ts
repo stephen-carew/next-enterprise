@@ -40,6 +40,14 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as { number: number }
     const { number } = body
 
+    // Check for existing table with the same number
+    const existingTable = await db.table.findUnique({
+      where: { number },
+    })
+    if (existingTable) {
+      return NextResponse.json({ error: "A table with this number already exists." }, { status: 400 })
+    }
+
     const table = await db.table.create({
       data: {
         number,

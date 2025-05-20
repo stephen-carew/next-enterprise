@@ -1,6 +1,6 @@
-import { kv } from "@vercel/kv"
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "../../../../lib/db"
+import { redis } from "../../../../lib/redis"
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ requestId: string }> }) {
   try {
@@ -26,8 +26,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         data: { status: "COMPLETED" },
       })
 
-      // Notify through KV store
-      await kv.publish("orders:update", {
+      // Notify through Redis
+      await redis.publish("orders:update", {
         type: "payment-confirmed",
         tableId: paymentRequest.tableId,
       })

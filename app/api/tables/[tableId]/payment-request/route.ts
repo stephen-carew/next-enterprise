@@ -1,6 +1,6 @@
-import { kv } from "@vercel/kv"
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "../../../../../lib/db"
+import { redis } from "../../../../../lib/redis"
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ tableId: string }> }) {
   try {
@@ -36,8 +36,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       },
     })
 
-    // Notify bartender through KV store
-    await kv.publish("payment-requests", {
+    // Notify bartender through Redis
+    await redis.publish("payment-requests", {
       type: "new",
       paymentRequestId: paymentRequest.id,
       tableId,

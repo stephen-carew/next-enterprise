@@ -1,37 +1,51 @@
-import { kv } from "@vercel/kv"
 import { NextResponse } from "next/server"
+import { Order } from "@/types/table"
+
+interface SSEUpdate {
+  type?: "connected" | "new-order"
+  orderId?: string
+  status?: Order["status"]
+  order?: Order
+}
+
+// Store active SSE connections
+const clients = new Set<ReadableStreamDefaultController>()
+
+// Broadcast message to all connected clients
+function broadcast(message: SSEUpdate) {
+  const data = `data: ${JSON.stringify(message)}\n\n`
+  clients.forEach((client) => {
+    try {
+      client.enqueue(new TextEncoder().encode(data))
+    } catch (error) {
+      console.error("Error sending message to client:", error)
+      clients.delete(client)
+    }
+  })
+}
+
+// Public function to send updates
+export function sendUpdate(message: SSEUpdate) {
+  broadcast(message)
+}
 
 export async function GET() {
-  const encoder = new TextEncoder()
-  const customReadable = new ReadableStream({
-    async start(controller) {
+  const stream = new ReadableStream({
+    start(controller) {
+      // Add client to set
+      clients.add(controller)
+
       // Send initial connection message
-      controller.enqueue(encoder.encode("data: " + JSON.stringify({ type: "connected" }) + "\n\n"))
+      controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: "connected" })}\n\n`))
 
-      // Subscribe to both specific order updates and general updates
-      const subscribers = [kv.subscribe("orders:update"), kv.subscribe("orders:*")]
-
-      // Handle messages from all subscribers
-      subscribers.forEach((subscriber) => {
-        subscriber.on("message", (message) => {
-          try {
-            // Ensure the message is properly formatted
-            const data = typeof message === "string" ? JSON.parse(message) : message
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
-          } catch (error) {
-            console.error("Error processing SSE message:", error)
-          }
-        })
-      })
-
-      // Handle client disconnect
+      // Remove client when connection closes
       return () => {
-        subscribers.forEach((subscriber) => subscriber.unsubscribe())
+        clients.delete(controller)
       }
     },
   })
 
-  return new NextResponse(customReadable, {
+  return new NextResponse(stream, {
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",

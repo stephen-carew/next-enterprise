@@ -1,6 +1,7 @@
-import { kv } from "@vercel/kv"
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "../../../../lib/db"
+import { redis } from "../../../../lib/redis"
+import { sendUpdate } from "../events/route"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ orderId: string }> }) {
   try {
@@ -31,13 +32,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ orderId: string }> }) {
   try {
-    const body = (await request.json()) as { status: "PENDING" | "PREPARING" | "COMPLETED" | "CANCELLED" }
-    const { status } = body
+    const body = (await request.json()) as {
+      status?: "PENDING" | "PREPARING" | "COMPLETED" | "CANCELLED"
+      items?: Array<{ drinkId: string; quantity: number; price: number }>
+    }
+    const { status, items } = body
     const { orderId } = await params
 
     // Check if order exists
     const existingOrder = await db.order.findUnique({
       where: { id: orderId },
+      include: {
+        OrderDrink: true,
+      },
     })
 
     if (!existingOrder) {
@@ -45,10 +52,31 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ error: "Order not found" }, { status: 404 })
     }
 
+    // Prepare update data
+    const updateData: { status?: "PENDING" | "PREPARING" | "COMPLETED" | "CANCELLED" } = {}
+    if (status) {
+      updateData.status = status
+    }
+
     // Update order in database
     const updatedOrder = await db.order.update({
       where: { id: orderId },
-      data: { status },
+      data: {
+        ...updateData,
+        ...(items && {
+          // Delete existing order drinks
+          OrderDrink: {
+            deleteMany: {},
+            // Create new order drinks
+            create: items.map((item) => ({
+              drinkId: item.drinkId,
+              quantity: item.quantity,
+            })),
+          },
+          // Update total
+          total: items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+        }),
+      },
       include: {
         table: true,
         OrderDrink: {
@@ -59,35 +87,58 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       },
     })
 
+    // If the order is now COMPLETED or CANCELLED, check if all orders for the table are done
+    if (status === "COMPLETED" || status === "CANCELLED") {
+      const activeOrders = await db.order.count({
+        where: {
+          tableId: updatedOrder.tableId,
+          status: { notIn: ["COMPLETED", "CANCELLED"] },
+        },
+      })
+      if (activeOrders === 0) {
+        await db.table.update({
+          where: { id: updatedOrder.tableId },
+          data: { status: "AVAILABLE" },
+        })
+      }
+    }
+
     try {
-      // Store in KV and publish update
-      await kv.set(`orders:${orderId}`, updatedOrder)
+      // Store in Redis and publish update
+      await redis.set(`orders:${orderId}`, updatedOrder)
 
       // Publish both specific order update and general update
       await Promise.all([
         // Publish specific order update
-        kv.publish(`orders:${orderId}`, {
+        redis.publish(`orders:${orderId}`, {
           orderId,
-          status,
+          status: updatedOrder.status,
           order: updatedOrder,
         }),
         // Publish general update for all clients
-        kv.publish("orders:update", {
+        redis.publish("orders:update", {
           orderId,
-          status,
+          status: updatedOrder.status,
           order: updatedOrder,
         }),
       ])
 
       console.log("Published order updates:", {
         orderId,
-        status,
+        status: updatedOrder.status,
         timestamp: new Date().toISOString(),
       })
-    } catch (kvError) {
-      console.error("Error updating KV store:", kvError)
-      // Continue even if KV update fails
+    } catch (redisError) {
+      console.error("Error updating Redis store:", redisError)
+      // Continue even if Redis update fails
     }
+
+    // Broadcast the update to all connected clients
+    sendUpdate({
+      orderId: updatedOrder.id,
+      status: updatedOrder.status,
+      order: updatedOrder,
+    })
 
     return NextResponse.json(updatedOrder)
   } catch (error) {

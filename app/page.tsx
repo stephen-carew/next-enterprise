@@ -1,24 +1,30 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-
+import { Order, Table } from "@/types/table";
 import { DrinkCard } from "../components/DrinkCard";
 import { OrderSummary } from "../components/OrderSummary";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-
 import { useOrderStore } from "../lib/store";
 import { Drink } from "../lib/types";
+
+interface TableLookupResponse {
+  table: Table;
+  hasActiveOrders: boolean;
+  activeOrders: Order[];
+}
 
 export default function Home() {
   const [drinks, setDrinks] = useState<Drink[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [tempTableNumber, setTempTableNumber] = useState<number | null>(null);
   const { tableNumber, setTableNumber } = useOrderStore();
+  const router = useRouter();
 
   useEffect(() => {
     fetchDrinks();
@@ -53,12 +59,23 @@ export default function Home() {
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!tempTableNumber) {
       toast.error("Please enter a table number");
       return;
     }
-    setTableNumber(tempTableNumber);
+    // Fetch table by number
+    try {
+      const response = await fetch(`/api/tables/lookup?number=${tempTableNumber}`);
+      if (!response.ok) throw new Error("Table not found");
+      const data = await response.json() as TableLookupResponse;
+      if (!data.table || !data.table.id) throw new Error("Table not found");
+      setTableNumber(tempTableNumber);
+      router.push(`/tables/${data.table.id}`);
+    } catch (error) {
+      console.error("Error fetching table:", error);
+      toast.error("Table not found");
+    }
   };
 
   return (
