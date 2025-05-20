@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { sendUpdate } from "./events/route"
-import { db } from "../../../lib/db"
-import { redis } from "../../../lib/redis"
-import { CreateOrderRequest } from "../../../lib/types"
+import { db } from "@/lib/db"
+import { redis } from "@/lib/redis"
+import { CreateOrderRequest } from "@/lib/types"
+import { sendUpdate } from "./utils"
 
 export async function POST(request: NextRequest) {
   try {
@@ -46,13 +46,7 @@ export async function POST(request: NextRequest) {
 
     // Store in Redis and publish update
     await redis.set(`orders:${order.id}`, order)
-    await redis.publish("orders:update", {
-      type: "new-order",
-      order,
-    })
-
-    // Broadcast the new order to all connected clients
-    sendUpdate({
+    await sendUpdate({
       type: "new-order",
       orderId: order.id,
       status: order.status,

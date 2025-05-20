@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { db } from "../../../../lib/db"
-import { redis } from "../../../../lib/redis"
-import { sendUpdate } from "../events/route"
+import { db } from "@/lib/db"
+import { redis } from "@/lib/redis"
+import { sendUpdate } from "../utils"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ orderId: string }> }) {
   try {
@@ -32,12 +32,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ orderId: string }> }) {
   try {
+    const { orderId } = await params
     const body = (await request.json()) as {
       status?: "PENDING" | "PREPARING" | "COMPLETED" | "CANCELLED"
       items?: Array<{ drinkId: string; quantity: number; price: number }>
     }
     const { status, items } = body
-    const { orderId } = await params
 
     // Check if order exists
     const existingOrder = await db.order.findUnique({
@@ -134,8 +134,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     // Broadcast the update to all connected clients
-    sendUpdate({
-      orderId: updatedOrder.id,
+    await sendUpdate({
+      type: "order-update",
+      orderId,
       status: updatedOrder.status,
       order: updatedOrder,
     })
