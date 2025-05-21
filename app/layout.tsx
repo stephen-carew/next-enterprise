@@ -1,12 +1,13 @@
+import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { Providers } from "./providers"
+import { Providers } from "@/components/providers"
 
 const inter = Inter({ subsets: ["latin"] })
 
-export const metadata = {
-  title: "Self-Service Bartender",
-  description: "Order your drinks directly from your table",
+export const metadata: Metadata = {
+  title: "Bartender",
+  description: "Digital menu and ordering system",
   twitter: {
     card: "summary_large_image",
   },
@@ -28,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <Providers>{children}</Providers>
       </body>

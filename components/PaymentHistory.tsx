@@ -109,8 +109,8 @@ export function PaymentHistory({ order, onRefund }: PaymentHistoryProps) {
                                 )}
                             </div>
                         </div>
-                        <Badge variant={getStatusVariant(order.paymentStatus || "PENDING")}>
-                            {order.paymentStatus || "PENDING"}
+                        <Badge variant={getStatusVariant(order.paymentStatus || "")}>
+                            {order.paymentStatus || ""}
                         </Badge>
                     </div>
 

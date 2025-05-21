@@ -17,6 +17,7 @@ export async function GET(request: Request) {
     }
 
     let table: TableWithOrders | null
+
     if (number) {
       const tableNumber = parseInt(number)
       if (isNaN(tableNumber)) {

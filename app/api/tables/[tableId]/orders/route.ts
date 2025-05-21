@@ -3,15 +3,6 @@ import { getServerSession } from "next-auth"
 import { db } from "@/lib/db"
 import prisma from "@/lib/prisma"
 
-interface OrderItem {
-  drinkId: string
-  quantity: number
-}
-
-interface CreateOrderRequest {
-  items: OrderItem[]
-}
-
 type RouteContext = {
   params: Promise<{
     tableId: string
@@ -56,11 +47,23 @@ export async function GET(request: NextRequest, context: RouteContext) {
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const { tableId } = await context.params
-    const body = (await request.json()) as CreateOrderRequest
-    const { items } = body
+    const body = (await request.json()) as {
+      items: Array<{
+        drinkId: string
+        quantity: number
+        notes?: string
+        price: number
+      }>
+      paymentMethod: "CASH" | "CARD"
+    }
+    const { items, paymentMethod } = body
 
     if (!items || !Array.isArray(items)) {
       return new NextResponse("Invalid request body", { status: 400 })
+    }
+
+    if (!paymentMethod || !["CASH", "CARD"].includes(paymentMethod)) {
+      return new NextResponse("Valid payment method is required", { status: 400 })
     }
 
     // Calculate total price
@@ -80,10 +83,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
       data: {
         tableId,
         total,
+        paymentMethod,
+        status: "PENDING",
+        paymentStatus: "PENDING",
         OrderDrink: {
           create: items.map((item) => ({
             drinkId: item.drinkId,
             quantity: item.quantity,
+            notes: item.notes || null,
           })),
         },
       },

@@ -1,10 +1,9 @@
 "use client"
 
-import { Html5Qrcode } from "html5-qrcode"
-import { Loader2 } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { IDetectedBarcode, outline, Scanner } from '@yudiel/react-qr-scanner'
+import React, { useEffect, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 
 interface QRScannerProps {
@@ -13,103 +12,102 @@ interface QRScannerProps {
 }
 
 export function QRScanner({ onScanSuccess, onScanError }: QRScannerProps) {
-    const [cameras, setCameras] = useState<{ id: string; label: string }[]>([])
-    const [selectedCamera, setSelectedCamera] = useState<string | null>(null)
-    const [isScanning, setIsScanning] = useState(false)
-    const scannerRef = useRef<Html5Qrcode | null>(null)
-    const scanRegionRef = useRef<HTMLDivElement>(null)
+    const [cameras, setCameras] = useState<MediaDeviceInfo[]>([])
+    const [selectedCameraId, setSelectedCameraId] = useState<string>()
+    const [scanning, setScanning] = useState(false)
 
     useEffect(() => {
-        Html5Qrcode.getCameras().then(devices => {
-            setCameras(devices)
-            if (devices.length > 0) setSelectedCamera(devices[0]!.id)
-        })
-        return () => {
-            const scanner = scannerRef.current
-            if (scanner) {
-                scanner.stop().catch(() => { })
-                scanner.clear()
-            }
-        }
+        console.log('[QR] Enumerating devices')
+        navigator.mediaDevices.enumerateDevices()
+            .then(devices => {
+                const videoInputs = devices.filter(d => d.kind === 'videoinput')
+                console.log('[QR] Video inputs:', videoInputs)
+                setCameras(videoInputs)
+                if (videoInputs.length) setSelectedCameraId(videoInputs[0]!.deviceId)
+            })
+            .catch(err => {
+                console.error('[QR] enumerateDevices error:', err)
+                onScanError?.(String(err))
+            })
     }, [])
 
-    const startScan = async () => {
-        if (!selectedCamera) return
-        setIsScanning(true)
-        scannerRef.current = new Html5Qrcode("custom-qr-region")
-        try {
-            await scannerRef.current.start(
-                { deviceId: { exact: selectedCamera } },
-                {
-                    fps: 10,
-                    qrbox: { width: 250, height: 250 },
-                },
-                (decodedText) => {
-                    setIsScanning(false)
-                    onScanSuccess(decodedText)
-                    if (scannerRef.current) {
-                        scannerRef.current.stop()
-                    }
-                },
-                (error) => {
-                    if (onScanError) onScanError(error)
-                }
-            )
-        } catch (err: unknown) {
-            console.error(err)
-            setIsScanning(false)
-            if (onScanError) onScanError(err instanceof Error ? err.message : String(err))
+    const handleScan = (codes: IDetectedBarcode[]) => {
+        console.log('[QR] handleScan called', codes);
+        if (!scanning) return
+        if (codes.length > 0 && codes[0]?.rawValue) {
+            setScanning(false)
+            onScanSuccess(codes[0].rawValue)
         }
     }
 
-    const stopScan = () => {
-        if (scannerRef.current) {
-            scannerRef.current.stop().then(() => setIsScanning(false))
-        }
+    const handleError = (error: unknown) => {
+        console.error('[QR] Scanner error:', error)
+        onScanError?.(error instanceof Error ? error.message : String(error))
+    }
+
+    const toggleScanning = () => {
+        console.log('[QR] toggleScanning, current:', scanning)
+        setScanning(prev => !prev)
     }
 
     return (
         <div className="flex flex-col items-center w-full max-w-md mx-auto">
             <div className="mb-4 flex gap-2 items-center w-full">
                 <Select
-                    value={selectedCamera || undefined}
-                    onValueChange={setSelectedCamera}
-                    disabled={isScanning || cameras.length === 0}
+                    value={selectedCameraId}
+                    onValueChange={val => { console.log('[QR] Camera selected:', val); setSelectedCameraId(val) }}
+                    disabled={scanning || cameras.length === 0}
                 >
                     <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select Camera" />
                     </SelectTrigger>
                     <SelectContent>
                         {cameras.map(cam => (
-                            <SelectItem key={cam.id} value={cam.id}>{cam.label}</SelectItem>
+                            <SelectItem key={cam.deviceId} value={cam.deviceId}>
+                                {cam.label || cam.deviceId}
+                            </SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
-                {!isScanning ? (
-                    <Button onClick={startScan} disabled={!selectedCamera}>
-                        Start Scanning
-                    </Button>
+                <Button onClick={toggleScanning} disabled={!selectedCameraId}>
+                    {scanning ? 'Stop Scanning' : 'Start Scanning'}
+                </Button>
+            </div>
+            <div className="w-full aspect-square rounded-lg border-2 border-primary overflow-hidden">
+                {selectedCameraId && scanning ? (
+                    <Scanner
+
+                        formats={[
+                            'qr_code',
+                            'micro_qr_code',
+                            'rm_qr_code',
+                        ]}
+                        constraints={{
+                            deviceId: selectedCameraId, facingMode: {
+                                ideal: "environment",
+                            },
+                        }}
+                        onScan={handleScan}
+                        onError={handleError}
+                        //paused={!scanning}
+                        components={{
+                            //onOff: true,
+                            torch: true,
+                            finder: true,
+                            zoom: true,
+                            tracker: outline
+                        }}
+                        scanDelay={2000}
+                        sound={true}
+
+
+                    />
                 ) : (
-                    <Button onClick={stopScan} variant="destructive">
-                        Stop Scanning
-                    </Button>
+                    <div className="h-full w-full flex items-center justify-center bg-background">
+                        <span className="text-muted-foreground">Camera preview will appear here</span>
+                    </div>
                 )}
             </div>
-            <div
-                id="custom-qr-region"
-                ref={scanRegionRef}
-                className="w-full aspect-square rounded-lg border-2 border-primary flex items-center justify-center bg-background"
-            >
-                {!isScanning && (
-                    <span className="text-muted-foreground">Camera preview will appear here</span>
-                )}
-            </div>
-            {isScanning && (
-                <div className="mt-4 flex items-center justify-center">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    <span className="ml-2 text-sm text-muted-foreground">Scanning...</span>
-                </div>
-            )}
         </div>
     )
-} 
+}

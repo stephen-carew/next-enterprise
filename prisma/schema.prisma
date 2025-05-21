@@ -31,14 +31,17 @@ model Table {
 }
 
 model Order {
-  id         String       @id @default(cuid())
-  tableId    String
-  status     OrderStatus  @default(PENDING)
-  total      Float
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-  table      Table        @relation(fields: [tableId], references: [id])
-  OrderDrink OrderDrink[]
+  id            String        @id @default(cuid())
+  tableId       String
+  status        OrderStatus   @default(PENDING)
+  total         Float
+  paymentMethod PaymentMethod
+  paymentStatus String        @default("PENDING")
+  paymentId     String?       // Optional payment ID
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  table         Table         @relation(fields: [tableId], references: [id])
+  OrderDrink    OrderDrink[]
 }
 
 model OrderDrink {
@@ -81,6 +84,13 @@ enum OrderStatus {
   PREPARING
   COMPLETED
   CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  APPLE_PAY
+  GOOGLE_PAY
 }
 
 model InventoryItem {

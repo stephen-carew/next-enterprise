@@ -1,8 +1,11 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { PaymentMethods } from "@/components/PaymentMethods"
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Drink, Order, Table } from '@/types/table';
 
@@ -39,6 +42,8 @@ export default function OrderPage({ params }: { params: Promise<{ tableId: strin
     const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
     const { toast } = useToast();
+    const [paymentMethod, setPaymentMethod] = useState<"CASH" | "CARD" | "APPLE_PAY" | "GOOGLE_PAY">("CASH");
+    const [showPayment, setShowPayment] = useState(false);
 
     useEffect(() => {
         const loadData = async () => {
@@ -149,6 +154,66 @@ export default function OrderPage({ params }: { params: Promise<{ tableId: strin
     const handleSubmitOrder = async () => {
         if (!table || cart.length === 0) return;
 
+        if (paymentMethod === "CASH") {
+            // For cash payments, create the order directly
+            try {
+                const orderItems = cart.map(item => ({
+                    drinkId: item.drink.id,
+                    quantity: item.quantity,
+                    notes: item.notes,
+                    price: item.drink.price
+                }));
+
+                const response = await fetch(`/api/tables/${table.id}/orders`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        items: orderItems,
+                        paymentMethod: "CASH",
+                    }),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json() as ErrorResponse;
+                    throw new Error(errorData.error || 'Failed to create order');
+                }
+
+                const orderData = await response.json();
+                console.log('Order created:', orderData);
+
+                toast({
+                    title: 'Success',
+                    description: 'Order placed successfully. Please pay at the counter.',
+                });
+
+                router.push(`/tables/${table.id}`);
+            } catch (error) {
+                console.error('Error creating order:', error);
+                toast({
+                    title: 'Error',
+                    description: error instanceof Error ? error.message : 'Failed to place order',
+                    variant: 'destructive',
+                });
+            }
+        } else {
+            // For card payments, show the payment panel
+            setShowPayment(true);
+        }
+    };
+
+    const handlePaymentComplete = async (paymentId: string, paymentStatus: "PAID" | "FAILED", paymentMethod: "CARD" | "APPLE_PAY" | "GOOGLE_PAY" | "CASH", paymentDetails?: { last4?: string; cardType?: string; expiryDate?: string }) => {
+        if (paymentStatus === "FAILED") {
+            toast({
+                title: "Error",
+                description: "Payment failed. Please try again.",
+                variant: "destructive",
+            });
+            setShowPayment(false);
+            return;
+        }
+
         try {
             const orderItems = cart.map(item => ({
                 drinkId: item.drink.id,
@@ -157,14 +222,16 @@ export default function OrderPage({ params }: { params: Promise<{ tableId: strin
                 price: item.drink.price
             }));
 
-            const response = await fetch('/api/orders', {
+            const response = await fetch(`/api/tables/${table!.id}/orders`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    tableId: table.id,
                     items: orderItems,
+                    paymentMethod,
+                    paymentId,
+                    paymentDetails,
                 }),
             });
 
@@ -181,7 +248,7 @@ export default function OrderPage({ params }: { params: Promise<{ tableId: strin
                 description: 'Order placed successfully',
             });
 
-            router.push(`/tables/${table.id}`);
+            router.push(`/tables/${table!.id}`);
         } catch (error) {
             console.error('Error creating order:', error);
             toast({
@@ -189,6 +256,8 @@ export default function OrderPage({ params }: { params: Promise<{ tableId: strin
                 description: error instanceof Error ? error.message : 'Failed to place order',
                 variant: 'destructive',
             });
+        } finally {
+            setShowPayment(false);
         }
     };
 
@@ -204,136 +273,168 @@ export default function OrderPage({ params }: { params: Promise<{ tableId: strin
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-            <div className="container mx-auto px-4 py-8">
-                <div className="max-w-6xl mx-auto">
-                    <div className="flex justify-between items-center mb-8">
-                        <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">
-                            {table ? `Table ${table.number} - New Order` : 'Loading...'}
-                        </h1>
-                        <Button variant="outline" onClick={() => router.back()}>
-                            Back
-                        </Button>
+            {showPayment ? (
+                <div className="container mx-auto px-4 py-8">
+                    <div className="max-w-md mx-auto">
+                        <PaymentMethods
+                            total={total}
+                            onPaymentComplete={handlePaymentComplete}
+                            onCancel={() => setShowPayment(false)}
+                        />
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        {/* Drinks Menu */}
-                        <div>
-                            <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                                Menu
-                            </h2>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {drinks.map((drink) => (
-                                    <Card key={drink.id} className="bg-white dark:bg-gray-800">
-                                        <CardHeader>
-                                            <CardTitle className="text-lg">{drink.name}</CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <p className="text-gray-600 dark:text-gray-400 mb-2">
-                                                {drink.description}
-                                            </p>
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-lg font-bold">
-                                                    ${drink.price.toFixed(2)}
-                                                </span>
-                                                <Button
-                                                    onClick={() => addToCart(drink)}
-                                                    disabled={!drink.isAvailable}
-                                                >
-                                                    Add to Order
-                                                </Button>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                ))}
-                            </div>
+                </div>
+            ) : (
+                <div className="container mx-auto px-4 py-8">
+                    <div className="max-w-6xl mx-auto">
+                        <div className="flex justify-between items-center mb-8">
+                            <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">
+                                {table ? `Table ${table.number} - New Order` : 'Loading...'}
+                            </h1>
+                            <Button variant="outline" onClick={() => router.back()}>
+                                Back
+                            </Button>
                         </div>
 
-                        {/* Order Cart */}
-                        <div>
-                            <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                                Your Order
-                            </h2>
-                            {cart.length === 0 ? (
-                                <Card className="bg-white dark:bg-gray-800">
-                                    <CardContent className="pt-6">
-                                        <p className="text-gray-600 dark:text-gray-400 text-center">
-                                            Your cart is empty. Add some drinks to get started!
-                                        </p>
-                                    </CardContent>
-                                </Card>
-                            ) : (
-                                <>
-                                    <div className="space-y-4 mb-6">
-                                        {cart.map((item) => (
-                                            <Card key={item.drink.id} className="bg-white dark:bg-gray-800">
-                                                <CardContent className="pt-6">
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <div>
-                                                            <h3 className="font-semibold">{item.drink.name}</h3>
-                                                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                                                ${item.drink.price.toFixed(2)} each
-                                                            </p>
-                                                        </div>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => removeFromCart(item.drink.id)}
-                                                        >
-                                                            Remove
-                                                        </Button>
-                                                    </div>
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="flex items-center gap-2">
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => updateQuantity(item.drink.id, item.quantity - 1)}
-                                                            >
-                                                                -
-                                                            </Button>
-                                                            <span className="w-8 text-center">{item.quantity}</span>
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => updateQuantity(item.drink.id, item.quantity + 1)}
-                                                            >
-                                                                +
-                                                            </Button>
-                                                        </div>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Add notes..."
-                                                            className="flex-1 px-3 py-2 border rounded-md"
-                                                            value={item.notes}
-                                                            onChange={(e) => updateNotes(item.drink.id, e.target.value)}
-                                                        />
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                        ))}
-                                    </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            {/* Drinks Menu */}
+                            <div>
+                                <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                                    Menu
+                                </h2>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {drinks.map((drink) => (
+                                        <Card key={drink.id} className="bg-white dark:bg-gray-800">
+                                            <CardHeader>
+                                                <CardTitle className="text-lg">{drink.name}</CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <p className="text-gray-600 dark:text-gray-400 mb-2">
+                                                    {drink.description}
+                                                </p>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-lg font-bold">
+                                                        ${drink.price.toFixed(2)}
+                                                    </span>
+                                                    <Button
+                                                        onClick={() => addToCart(drink)}
+                                                        disabled={!drink.isAvailable}
+                                                    >
+                                                        Add to Order
+                                                    </Button>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Order Cart */}
+                            <div>
+                                <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                                    Your Order
+                                </h2>
+                                {cart.length === 0 ? (
                                     <Card className="bg-white dark:bg-gray-800">
                                         <CardContent className="pt-6">
-                                            <div className="flex justify-between items-center mb-4">
-                                                <span className="text-lg font-semibold">Total</span>
-                                                <span className="text-2xl font-bold">
-                                                    ${total.toFixed(2)}
-                                                </span>
-                                            </div>
-                                            <Button
-                                                className="w-full"
-                                                onClick={handleSubmitOrder}
-                                            >
-                                                Place Order
-                                            </Button>
+                                            <p className="text-gray-600 dark:text-gray-400 text-center">
+                                                Your cart is empty. Add some drinks to get started!
+                                            </p>
                                         </CardContent>
                                     </Card>
-                                </>
-                            )}
+                                ) : (
+                                    <>
+                                        <div className="space-y-4 mb-6">
+                                            {cart.map((item) => (
+                                                <Card key={item.drink.id} className="bg-white dark:bg-gray-800">
+                                                    <CardContent className="pt-6">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <div>
+                                                                <h3 className="font-semibold">{item.drink.name}</h3>
+                                                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                                                    ${item.drink.price.toFixed(2)} each
+                                                                </p>
+                                                            </div>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => removeFromCart(item.drink.id)}
+                                                            >
+                                                                Remove
+                                                            </Button>
+                                                        </div>
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="flex items-center gap-2">
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => updateQuantity(item.drink.id, item.quantity - 1)}
+                                                                >
+                                                                    -
+                                                                </Button>
+                                                                <span className="w-8 text-center">{item.quantity}</span>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => updateQuantity(item.drink.id, item.quantity + 1)}
+                                                                >
+                                                                    +
+                                                                </Button>
+                                                            </div>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Add notes..."
+                                                                className="flex-1 px-3 py-2 border rounded-md"
+                                                                value={item.notes}
+                                                                onChange={(e) => updateNotes(item.drink.id, e.target.value)}
+                                                            />
+                                                        </div>
+                                                    </CardContent>
+                                                </Card>
+                                            ))}
+                                        </div>
+                                        <Card className="bg-white dark:bg-gray-800">
+                                            <CardContent className="pt-6">
+                                                <div className="flex justify-between items-center mb-4">
+                                                    <span className="text-lg font-semibold">Total</span>
+                                                    <span className="text-2xl font-bold">
+                                                        ${total.toFixed(2)}
+                                                    </span>
+                                                </div>
+                                                <div className="space-y-4">
+                                                    <div className="space-y-2">
+                                                        <Label>Payment Method</Label>
+                                                        <Select
+                                                            value={paymentMethod}
+                                                            onValueChange={(value) => setPaymentMethod(value as "CASH" | "CARD" | "APPLE_PAY" | "GOOGLE_PAY")}
+                                                        >
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder="Select payment method" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="CASH">Cash</SelectItem>
+                                                                <SelectItem value="CARD">Card</SelectItem>
+                                                                <SelectItem value="APPLE_PAY">Apple Pay</SelectItem>
+                                                                <SelectItem value="GOOGLE_PAY">Google Pay</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                    <Button
+                                                        className="w-full"
+                                                        onClick={handleSubmitOrder}
+                                                        disabled={!paymentMethod}
+                                                    >
+                                                        Place Order
+                                                    </Button>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 } 

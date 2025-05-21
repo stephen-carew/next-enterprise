@@ -74,6 +74,7 @@ export interface CreateOrderRequest {
     notes?: string
     price: number
   }>
+  paymentMethod: "CASH" | "CARD"
 }
 
 export interface OrderItem {

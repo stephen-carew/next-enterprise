@@ -5,10 +5,11 @@ import { Apple, Banknote, CreditCard, Wallet } from "lucide-react"
 import { useState } from "react"
 import { toast } from "react-hot-toast"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Separator } from "@/components/ui/separator"
 
 interface PaymentMethodsProps {
     total: number
@@ -136,9 +137,12 @@ export function PaymentMethods({ total, onPaymentComplete, onCancel }: PaymentMe
     }
 
     return (
-        <Card className="w-full max-w-md mx-auto">
-            <CardHeader>
-                <CardTitle className="text-center">Payment Details</CardTitle>
+        <Card className="w-full max-w-md mx-auto shadow-lg">
+            <CardHeader className="space-y-1">
+                <CardTitle className="text-2xl font-bold text-center">Payment Details</CardTitle>
+                <CardDescription className="text-center text-muted-foreground">
+                    Select your preferred payment method
+                </CardDescription>
             </CardHeader>
             <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -146,11 +150,12 @@ export function PaymentMethods({ total, onPaymentComplete, onCancel }: PaymentMe
                         <RadioGroup
                             value={paymentMethod}
                             onValueChange={(value) => setPaymentMethod(value as "CARD" | "APPLE_PAY" | "GOOGLE_PAY" | "CASH")}
-                            className="grid grid-cols-2 md:grid-cols-4 gap-4"
+                            className="grid grid-cols-2 gap-4"
                         >
                             <motion.div
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                className="relative"
                             >
                                 <RadioGroupItem
                                     value="CARD"
@@ -159,49 +164,16 @@ export function PaymentMethods({ total, onPaymentComplete, onCancel }: PaymentMe
                                 />
                                 <Label
                                     htmlFor="card"
-                                    className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                                    className="flex flex-col items-center justify-between rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary transition-colors"
                                 >
                                     <CreditCard className="mb-3 h-6 w-6" />
-                                    <span>Card</span>
+                                    <span className="text-sm font-medium">Card</span>
                                 </Label>
                             </motion.div>
                             <motion.div
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                            >
-                                <RadioGroupItem
-                                    value="APPLE_PAY"
-                                    id="apple"
-                                    className="peer sr-only"
-                                />
-                                <Label
-                                    htmlFor="apple"
-                                    className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
-                                >
-                                    <Apple className="mb-3 h-6 w-6" />
-                                    <span>Apple Pay</span>
-                                </Label>
-                            </motion.div>
-                            <motion.div
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                            >
-                                <RadioGroupItem
-                                    value="GOOGLE_PAY"
-                                    id="google"
-                                    className="peer sr-only"
-                                />
-                                <Label
-                                    htmlFor="google"
-                                    className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
-                                >
-                                    <Wallet className="mb-3 h-6 w-6" />
-                                    <span>Google Pay</span>
-                                </Label>
-                            </motion.div>
-                            <motion.div
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                className="relative"
                             >
                                 <RadioGroupItem
                                     value="CASH"
@@ -210,10 +182,46 @@ export function PaymentMethods({ total, onPaymentComplete, onCancel }: PaymentMe
                                 />
                                 <Label
                                     htmlFor="cash"
-                                    className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                                    className="flex flex-col items-center justify-between rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary transition-colors"
                                 >
                                     <Banknote className="mb-3 h-6 w-6" />
-                                    <span>Cash</span>
+                                    <span className="text-sm font-medium">Cash</span>
+                                </Label>
+                            </motion.div>
+                            <motion.div
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                className="relative"
+                            >
+                                <RadioGroupItem
+                                    value="APPLE_PAY"
+                                    id="apple"
+                                    className="peer sr-only"
+                                />
+                                <Label
+                                    htmlFor="apple"
+                                    className="flex flex-col items-center justify-between rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary transition-colors"
+                                >
+                                    <Apple className="mb-3 h-6 w-6" />
+                                    <span className="text-sm font-medium">Apple Pay</span>
+                                </Label>
+                            </motion.div>
+                            <motion.div
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                className="relative"
+                            >
+                                <RadioGroupItem
+                                    value="GOOGLE_PAY"
+                                    id="google"
+                                    className="peer sr-only"
+                                />
+                                <Label
+                                    htmlFor="google"
+                                    className="flex flex-col items-center justify-between rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary transition-colors"
+                                >
+                                    <Wallet className="mb-3 h-6 w-6" />
+                                    <span className="text-sm font-medium">Google Pay</span>
                                 </Label>
                             </motion.div>
                         </RadioGroup>
@@ -229,7 +237,7 @@ export function PaymentMethods({ total, onPaymentComplete, onCancel }: PaymentMe
                                 className="space-y-4"
                             >
                                 <div className="space-y-2">
-                                    <Label htmlFor="cardNumber">Card Number</Label>
+                                    <Label htmlFor="cardNumber" className="text-sm font-medium">Card Number</Label>
                                     <Input
                                         id="cardNumber"
                                         placeholder="1234 5678 9012 3456"
@@ -241,15 +249,15 @@ export function PaymentMethods({ total, onPaymentComplete, onCancel }: PaymentMe
                                         }}
                                         maxLength={19}
                                         required
-                                        className={!isCardValid ? "border-red-500" : ""}
+                                        className={`h-10 ${!isCardValid ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                                     />
                                     {!isCardValid && (
-                                        <p className="text-sm text-red-500">Please enter a valid card number</p>
+                                        <p className="text-sm text-red-500 mt-1">Please enter a valid card number</p>
                                     )}
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="expiryDate">Expiry Date</Label>
+                                        <Label htmlFor="expiryDate" className="text-sm font-medium">Expiry Date</Label>
                                         <Input
                                             id="expiryDate"
                                             placeholder="MM/YY"
@@ -261,14 +269,14 @@ export function PaymentMethods({ total, onPaymentComplete, onCancel }: PaymentMe
                                             }}
                                             maxLength={5}
                                             required
-                                            className={!isExpiryValid ? "border-red-500" : ""}
+                                            className={`h-10 ${!isExpiryValid ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                                         />
                                         {!isExpiryValid && (
-                                            <p className="text-sm text-red-500">Please enter a valid expiry date</p>
+                                            <p className="text-sm text-red-500 mt-1">Please enter a valid expiry date</p>
                                         )}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="cvv">CVV</Label>
+                                        <Label htmlFor="cvv" className="text-sm font-medium">CVV</Label>
                                         <Input
                                             id="cvv"
                                             placeholder="123"
@@ -280,10 +288,10 @@ export function PaymentMethods({ total, onPaymentComplete, onCancel }: PaymentMe
                                             }}
                                             maxLength={4}
                                             required
-                                            className={!isCvvValid ? "border-red-500" : ""}
+                                            className={`h-10 ${!isCvvValid ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                                         />
                                         {!isCvvValid && (
-                                            <p className="text-sm text-red-500">Please enter a valid CVV</p>
+                                            <p className="text-sm text-red-500 mt-1">Please enter a valid CVV</p>
                                         )}
                                     </div>
                                 </div>
@@ -297,25 +305,28 @@ export function PaymentMethods({ total, onPaymentComplete, onCancel }: PaymentMe
                                 transition={{ duration: 0.2 }}
                                 className="space-y-4"
                             >
-                                <div className="text-center p-4 bg-muted rounded-lg">
+                                <div className="text-center p-6 bg-muted/50 rounded-lg border border-muted">
+                                    <Banknote className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
                                     <p className="text-sm text-muted-foreground">
-                                        Please pay at the counter. The bartender will confirm your payment.
+                                        Please proceed to the counter to complete your payment. The bartender will confirm your payment.
                                     </p>
                                 </div>
                             </motion.div>
                         )}
                     </AnimatePresence>
 
+                    <Separator className="my-6" />
+
                     <div className="space-y-4">
-                        <div className="flex justify-between text-lg font-semibold">
-                            <span>Total</span>
-                            <span>${total.toFixed(2)}</span>
+                        <div className="flex justify-between items-center p-4 bg-muted/50 rounded-lg">
+                            <span className="text-lg font-medium">Total Amount</span>
+                            <span className="text-2xl font-bold">${total.toFixed(2)}</span>
                         </div>
                         <div className="flex gap-4">
                             <Button
                                 type="button"
                                 variant="outline"
-                                className="flex-1"
+                                className="flex-1 h-11"
                                 onClick={onCancel}
                                 disabled={isProcessing}
                             >
@@ -323,7 +334,7 @@ export function PaymentMethods({ total, onPaymentComplete, onCancel }: PaymentMe
                             </Button>
                             <Button
                                 type="submit"
-                                className="flex-1"
+                                className="flex-1 h-11"
                                 disabled={isProcessing}
                             >
                                 {isProcessing ? (

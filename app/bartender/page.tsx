@@ -6,6 +6,7 @@ import { signOut } from "next-auth/react"
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { PaymentHistory } from "@/components/PaymentHistory";
+import { ThemeToggle } from "@/components/theme-toggle"
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -189,8 +190,10 @@ export default function BartenderPage() {
                 body: JSON.stringify({ status: newStatus }),
             });
 
+            const data = await response.json() as { error?: string };
+
             if (!response.ok) {
-                throw new Error("Failed to update order status");
+                throw new Error(data.error || "Failed to update order status");
             }
 
             setOrders(prevOrders =>
@@ -204,7 +207,7 @@ export default function BartenderPage() {
             toast.success(`Order status updated to ${newStatus.toLowerCase()}`);
         } catch (error) {
             console.error("Error updating order status:", error);
-            toast.error("Failed to update order status");
+            toast.error(error instanceof Error ? error.message : "Failed to update order status");
         }
     };
 
@@ -247,23 +250,26 @@ export default function BartenderPage() {
                 },
             });
 
+            const data = await response.json() as { error?: string; paymentId: string };
+
             if (!response.ok) {
-                throw new Error("Failed to confirm cash payment");
+                throw new Error(data.error || "Failed to confirm cash payment");
             }
 
             // Update the order's payment status
             setOrders(prevOrders =>
                 prevOrders.map(order =>
                     order.id === orderId
-                        ? { ...order, paymentStatus: "PAID" }
+                        ? { ...order, paymentStatus: "PAID", paymentId: data.paymentId }
                         : order
                 )
             );
 
-            toast.success("Cash payment confirmed");
+            toast.success("Cash payment confirmed successfully");
         } catch (error) {
             console.error("Error confirming cash payment:", error);
-            toast.error("Failed to confirm cash payment");
+            toast.error(error instanceof Error ? error.message : "Failed to confirm cash payment");
+            throw error; // Re-throw to be handled by the PaymentHistory component
         }
     };
 
@@ -301,6 +307,18 @@ export default function BartenderPage() {
         }
     };
 
+    const formatDate = (date: string | Date) => {
+        return new Date(date).toLocaleString('en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+    };
+
     const filteredOrders = orders.filter(order =>
         paymentStatusFilter === "ALL" ||
         (paymentStatusFilter === "PENDING" && (!order.paymentStatus || order.paymentStatus === "PENDING")) ||
@@ -308,7 +326,15 @@ export default function BartenderPage() {
     );
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="min-h-screen bg-background">
+            <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                <div className="container flex h-14 items-center justify-between">
+                    <h1 className="text-xl font-bold">Bartender Dashboard</h1>
+                    <div className="flex items-center space-x-4">
+                        <ThemeToggle />
+                    </div>
+                </div>
+            </header>
             <div className="container mx-auto px-4 py-8 md:py-12">
                 <div className="max-w-7xl mx-auto">
                     <div className="flex justify-between items-center mb-8">
@@ -436,12 +462,16 @@ export default function BartenderPage() {
                                         <div className="flex justify-between items-center">
                                             <CardTitle>Table {order.table.number}</CardTitle>
                                             <Badge variant={getStatusVariant(order.status)}>
-                                                {order.status}
+                                                {order.status === "PENDING" ? "CREATED" : order.status}
                                             </Badge>
                                         </div>
                                         <div className="flex justify-between items-center mt-2">
                                             <div className="text-sm text-muted-foreground">
-                                                Payment ID: {order.paymentId}
+                                                {order.status === "COMPLETED" ? (
+                                                    <span>Completed: {formatDate(order.updatedAt)}</span>
+                                                ) : (
+                                                    <span>Created: {formatDate(order.createdAt)}</span>
+                                                )}
                                             </div>
                                             <Badge variant={getPaymentStatusVariant(order.paymentStatus)}>
                                                 {order.paymentStatus}
@@ -476,14 +506,6 @@ export default function BartenderPage() {
                                                     </Button>
                                                 )}
                                                 {order.status === "PREPARING" && (
-                                                    <Button
-                                                        onClick={() => handleStatusChange(order.id, "READY")}
-                                                        className="w-full"
-                                                    >
-                                                        Mark as Ready
-                                                    </Button>
-                                                )}
-                                                {order.status === "READY" && (
                                                     <Button
                                                         onClick={() => handleStatusChange(order.id, "COMPLETED")}
                                                         className="w-full"

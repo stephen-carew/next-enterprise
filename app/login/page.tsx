@@ -13,29 +13,38 @@ import { Label } from "@/components/ui/label"
 export default function LoginPage() {
     const router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
+    const [error, setError] = useState<string | null>(null)
 
     async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault()
         setIsLoading(true)
+        setError(null)
 
         const formData = new FormData(event.currentTarget)
         const email = formData.get("email") as string
         const password = formData.get("password") as string
 
         try {
+            console.log("Attempting login for:", email)
+
             const result = await signIn("credentials", {
                 email,
                 password,
                 redirect: false,
             })
 
+            console.log("Sign in result:", result)
+
             if (result?.error) {
+                setError(result.error)
                 toast.error("Invalid email or password")
                 return
             }
 
             // Check user role and redirect accordingly
             const response = await fetch("/api/auth/check-admin")
+            console.log("Admin check response:", response.status)
+
             if (response.ok) {
                 router.push("/admin")
             } else {
@@ -43,6 +52,7 @@ export default function LoginPage() {
             }
         } catch (error) {
             console.error("Login error:", error)
+            setError("An unexpected error occurred")
             toast.error("An error occurred during login")
         } finally {
             setIsLoading(false)
@@ -89,6 +99,11 @@ export default function LoginPage() {
                                             className="w-full"
                                         />
                                     </div>
+                                    {error && (
+                                        <p className="text-sm text-red-500">
+                                            {error}
+                                        </p>
+                                    )}
                                     <Button className="w-full" type="submit" disabled={isLoading}>
                                         {isLoading ? "Signing in..." : "Sign in"}
                                     </Button>

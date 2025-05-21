@@ -10,6 +10,7 @@ export interface Order {
   id: string
   tableId: string
   status: "PENDING" | "PREPARING" | "COMPLETED" | "CANCELLED"
+  paymentStatus: "PENDING" | "PAID" | "FAILED" | "REFUNDED"
   total: number
   createdAt: Date
   updatedAt: Date

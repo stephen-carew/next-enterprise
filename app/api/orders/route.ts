@@ -7,7 +7,7 @@ import { sendUpdate } from "./utils"
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as CreateOrderRequest
-    const { tableId, items } = body
+    const { tableId, items, paymentMethod } = body
 
     if (!tableId) {
       return new NextResponse("Table ID is required", { status: 400 })
@@ -15,6 +15,10 @@ export async function POST(request: NextRequest) {
 
     if (!items || items.length === 0) {
       return new NextResponse("Order items are required", { status: 400 })
+    }
+
+    if (!paymentMethod || !["CASH", "CARD"].includes(paymentMethod)) {
+      return new NextResponse("Valid payment method is required", { status: 400 })
     }
 
     // Calculate total
@@ -26,6 +30,8 @@ export async function POST(request: NextRequest) {
         tableId,
         status: "PENDING",
         total,
+        paymentMethod: paymentMethod,
+        paymentStatus: "PENDING",
         OrderDrink: {
           create: items.map((item) => ({
             drinkId: item.drinkId,

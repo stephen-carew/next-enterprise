@@ -1,37 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
-import { db } from "../../../lib/db"
+import { db } from "@/lib/db"
 
 export async function GET() {
   try {
     const tables = await db.table.findMany({
-      include: {
-        orders: {
-          where: {
-            status: {
-              notIn: ["COMPLETED", "CANCELLED"],
-            },
-          },
-          include: {
-            OrderDrink: {
-              include: {
-                Drink: true,
-              },
-            },
-          },
-        },
+      orderBy: {
+        number: "asc",
       },
     })
 
-    // Calculate total owed for each table
-    const tablesWithTotals = tables.map((table) => ({
-      ...table,
-      totalOwed: table.orders.reduce((sum, order) => sum + order.total, 0),
-    }))
-
-    return NextResponse.json(tablesWithTotals)
+    return NextResponse.json(tables)
   } catch (error) {
     console.error("Error fetching tables:", error)
-    return new NextResponse("Internal error", { status: 500 })
+    return NextResponse.json({ error: "Failed to fetch tables" }, { status: 500 })
   }
 }
 
