@@ -3,9 +3,9 @@ import { db } from "@/lib/db"
 import { redis } from "@/lib/redis"
 import { sendUpdate } from "../../utils"
 
-export async function POST(request: NextRequest, { params }: { params: { orderId: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ orderId: string }> }) {
   try {
-    const { orderId } = params
+    const { orderId } = await params
 
     // Check if order exists
     const order = await db.order.findUnique({

@@ -75,6 +75,7 @@ export default function QRCodePage() {
                     codes.push(code)
                     toast.success(`Generated QR code for Table ${i}`)
                 } catch (error) {
+                    console.error(`Error generating QR code for Table ${i}:`, error)
                     toast.error(`Failed to generate QR code for Table ${i}`)
                 }
             }
@@ -95,8 +96,6 @@ export default function QRCodePage() {
         }
 
         const pdf = new jsPDF()
-        const pageWidth = pdf.internal.pageSize.getWidth()
-        const pageHeight = pdf.internal.pageSize.getHeight()
         const qrSize = 100 // Size of QR code in PDF
         const margin = 20
         const spacing = 20
@@ -110,7 +109,6 @@ export default function QRCodePage() {
                 pdf.addPage()
             }
 
-            const pageIndex = Math.floor(i / itemsPerPage)
             const itemIndex = i % itemsPerPage
             const x = margin + (itemIndex % 2) * (qrSize + spacing)
             const y = margin + Math.floor(itemIndex / 2) * (qrSize + spacing + 20)
