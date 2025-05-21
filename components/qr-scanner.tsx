@@ -97,7 +97,7 @@ export function QRScanner({ onScanSuccess, onScanError }: QRScannerProps) {
                             zoom: true,
                             tracker: outline
                         }}
-                        scanDelay={2000}
+                        scanDelay={6000}
                         sound={true}
 
 
